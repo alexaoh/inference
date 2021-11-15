@@ -1,0 +1,519 @@
+---
+title: Advanced Statistical Inference. R labs
+author: "Alex Sanchez-Pla"
+date: "September 2021"
+output:
+   html_document:
+    code_folding: hide
+    toc: true
+    toc_depth: 3
+    theme: cerulean
+    highlight: textmate
+    number_sections: true
+editor_options: 
+  chunk_output_type: console
+# theme args should be one of: "default", "cerulean", "journal", "flatly", "darkly", "readable", "spacelab", "united", "cosmo", "lumen", "paper", "sandstone", "simplex", "yeti"
+---
+
+This notebook contains code and examples to extend or clarify some topics from the "Advanced Statistical Inference" course.
+
+# Investigating Convergence Concepts
+
+
+
+
+## The law of large numbers
+
+The LLN can be illustrated  in the context of a sequence of iid Bernoulli random variables. 
+
+We fix the parameter at  p=0.3. We then consider a varying number n of such random variables and the corresponding sums. We know that these are binomial with parameters  (n,p)
+The plot below draws, for each n, the 10-percentile and the 90-percentile of Bin(n,p).
+
+```{r}
+p = 0.3
+n = 20*(1:50)
+L = qbinom(0.10, n, p)/n
+U = qbinom(0.90, n, p)/n
+plot(n, rep(p, length(n)), type = "n", ylim = c(min(L), max(U)), xlab="n", ylab = "")
+segments(n, L, n, U, lwd = 2, col = "black")
+abline(h = p, lty = 2)
+```
+
+- Where does this sequence converge to?
+- Does the plot suggest such convergence? Change it into a logarithmic scale.
+
+```{r}
+n = 2^(10:20)
+L = qbinom(0.10, n, p)/n
+U = qbinom(0.90, n, p)/n
+plot(n, rep(p, length(n)), log = "x", type = "n", ylim = c(min(L), max(U)), xlab="n", ylab = "")
+segments(n, L, n, U, lwd = 2, col = "black")
+abline(h = p, lty = 2)
+```
+
+## The Central limit theorem
+
+The Law of Large Numbers provides a first-order limit, which is deterministic: The sequence of partial means converges to the mean of the underlying distribution generating the random variables. 
+
+The Central Limit Theorem provides a second-order limit, which does not exist in a deterministic sence, but does in the distributional sense: The sequence of partial means, when standardized, converges in distribution to the standard normal distribution. (This assumes that the underlying distribution has finite second moment.)
+
+To see this, we go back to the binomial example above, but we track down multiple quantiles of the successive (standardized) binomial distributions.
+
+```{r}
+p = 0.3
+n = 20*(1:50)
+Q = matrix(NA, 50, 9) # each row stores the quantiles of standardized binomial distribution
+for (k in 1:50){
+  Q[k, ] = (qbinom((1:9)/10, n[k], p) - n[k]*p)/sqrt(n[k]*p*(1-p))
+}  
+matplot(n, Q, type = "l", lty = 1, lwd = 2, col = 4, xlab = "n", ylab = "quantiles")
+abline(h = qnorm((1:9)/10), lty = 2) # quantiles of the standard normal distribution
+```
+
+### The CLT and sampling distribution of the mean
+
+A typical illustration of the CLT for the sample mean.
+
+```{r}
+datos<-list()
+datos[[1]] <- matrix(runif(10000),nrow=1000)
+datos[[2]] <- matrix(rexp(10000),nrow=1000)
+datos[[3]] <- matrix(rnorm(10000),nrow=1000)
+names(datos)<-c("Unifor","Exponential","Gaussian")
+opt<-par(mfrow=c(3,3))
+for (i in 1:3){
+  x<-datos[[i]]
+  m1<-x[,1]
+  m2<-apply(x[,1:2],1,mean)
+  m3<-apply(x,1,mean)
+  hist(m1, 20, main=paste(names(datos)[i], "n=1", sep="\n"), cex.main=0.8);
+  hist(m2, 20, main=paste(names(datos)[i], "n=2 (mean)", sep="\n"), cex.main=0.8)
+  hist(m3, 20, main=paste(names(datos)[i], "n=10 (mean)", sep="\n"), cex.main=0.8)
+}
+```
+
+Strictly speaking we are not illustrating the CLT here. What should we do for a better illustration?
+
+# The empirical distribution function
+
+## Building the empirical distribution function
+
+- The empirical distribution function can be intuitively described through the following algorithm.
+
+- Take a sample and consider it "fixed"
+- Sort it
+- consider values x that go from  $-\infty$ to $\infty$ or, simply, from below the smallest number (e.g. $min(X_0)-1$) to above the highest value (e.g.$max(x_0)+1$).
+    - Be sure to increase $x$ in such a way that the values in the sample will be "hit" by it,
+- Build two vectors as followss:
+
+    - $x_0=min(\mathbb{x_0})-1$
+    - $y_0 = 0$
+    - While $x_i< max(\mathbb{x_0})+1$ do
+        - $x_i+1 = x_i+\Delta$
+        - if $x_{i+1} \in \mathbb{x_0^{sorted}}$ then $y_{i+1}=y_i+\Delta$
+
+- The values of $y$ form an approximation to the empirical cdf of $\mathbb{x_0}$
+
+
+
+Implement an R function that generates the empirical distibution function given a sample.
+
+R has a function implemented that computes the ecdf.º
+
+```{r}
+x0<-c(0.4,0.1,-0.6, 1.8,0.5,-2.0, 0.7, -0.5, -1.1, -0.2, -1.0, -0.7)
+Fn <- ecdf(x0)
+Fn(x0)
+summary(Fn)
+knots(Fn)
+sort(unique(Fn(x0)))
+```
+
+
+## Ploting the empirical cdf with R
+
+Functions `ecdf` and `plot.ecdf` facilitate the visualization of the empirical cdf.
+
+```{r}
+op <- par(mfrow=c(3,1), mgp=c(1.5, 0.8,0), mar= .1+c(3,3,2,1))
+
+set.seed(123)
+x0 <- round(rnorm(12),3)
+x0
+
+
+Fn12 <- ecdf(x0)
+summary(Fn12)
+
+plot(Fn12)
+plot(Fn12, verticals= TRUE, do.points = FALSE)
+
+plot(Fn12 , lwd = 2) ; mtext("lwd = 2", adj=1)
+xx <- unique(sort(c(seq(-3, 2, length=201), knots(Fn12))))
+lines(xx, Fn12(xx), col='blue')
+abline(v=knots(Fn12),lty=2,col='gray70')
+
+plot(xx, Fn12(xx), type='o', cex=.1)#- plot.default {ugly}
+plot(Fn12, col.hor='red', add= TRUE)  #- plot method
+abline(v=knots(Fn12),lty=2,col='gray70')
+## luxury plot
+plot(Fn12, verticals=TRUE, col.points='blue',
+     col.hor='red', col.vert='bisque')
+
+##-- this works too (automatic call to  ecdf(.)):
+plot.ecdf(rnorm(24))
+title("via  simple  plot.ecdf(x)", adj=1)
+
+par(op)
+
+```
+
+## Showing that $F_n()$ approximates $F()$
+
+For the normal distribution
+
+```{r}
+op<-par(mfrow=c(2,2))
+for(n in c(10, 20, 50, 100)){
+  x<- sort(rnorm(n))
+  plot.ecdf(x, main=paste ("Empirical cdf \n (Samples from N(0,1)), n=", n), cex.main=0.7)
+  tcdf<- pnorm(x)
+  lines(x,tcdf)
+ }
+par(op)
+```
+
+Or the uniform distribution
+
+```{r}
+op<-par(mfrow=c(2,2))
+for(n in c(10, 20, 50, 100)){
+  x<- sort(runif(n))
+  plot.ecdf(x, main=paste ("Empirical cdf (Samples from U(0,1)), n=", n))
+  tcdf<- punif(x)
+  lines(x,tcdf)
+ }
+```
+
+
+
+# The bootstrap
+
+## Basic resampling (i): Standard error of the mean
+
+```{r}
+
+# Asignación de los datos a un vector
+x <- c(94,197,16,38,99,141,23)
+#Calculo de la media y de su error estandar
+theta <- mean(x)
+stderrtheta <- sqrt(var (x)/length(x))
+#Visualizacion de la media y de su error estandar
+cat("theta = " , theta,"\n")
+cat("Error estandard de theta = " , stderrtheta,"\n")
+# Preparacion del remuestreo
+# Numero de remuestras
+nboot<-100
+# Creación de un vector en donde guardar las remuestras
+distboot<- rep(NA,nboot)
+# Remuestreo
+for (b in 1:nboot)
+   {x.boot<-sample(x,replace=T)
+    distboot[b] <-mean (x.boot)
+}
+hist(distboot)
+
+# Error estandar bootstrap
+stderrboot <-sqrt(var(distboot))
+#Visualizacion del error estandar bootstrap
+cat("Error estandard bootstrap= " , stderrboot,"\n")
+# Distribucion bootstrap
+results<-summary(distboot)
+print(results)
+```
+
+```{r}
+bootstrapsSeMean <- function(x, B){
+ res <- numeric(B)
+ for(i in 1:B)
+ res[i] <- mean(sample(x, replace=TRUE))
+ res <- sd(res)
+ return(res)
+}
+x <- c(94,197,16,38,99,141,23)
+bootstrapsSeMean (x, 100)
+```
+
+## Basic resampling (ii): Standard error of the median
+
+```{r}
+bootstrapSeMedian <- function(x, B){
+  res <- numeric(B)
+  for(i in 1:B)
+	 res[i] <- median(sample(x, replace=TRUE))
+	 res <- sd(res)
+	 return(res)
+}
+bootstrapSeMedian(x, 1000)
+```
+
+## The bootstrap distribution
+
+The histogram of all estimations computed on all the resamples is an approximation to the *bootstrap* distribution of the statistic.
+
+```{r}
+if (!require(bootstrap)) install.packages("bootstrap", dep=TRUE)
+library(bootstrap) 
+data('law')
+
+set.seed(1)
+theta <- function(ind) {
+  cor(law[ind, 1], law[ind, 2], method = "pearson")
+}
+
+theta0 <- cor(law$LSAT, law$GPA)
+
+# for(b in 1:5){
+#   indiv<- sample(1:15, replace=TRUE)
+#   show(t(resample <- law[indiv,]))
+#   show(cor(resample)[1,2])
+# }
+law.boot <- bootstrap(1:15, 1000, theta) 
+summary(law.boot)
+```
+An approximation to the bootstrap distribution.
+
+```{r}
+hist(law.boot$thetastar)
+```
+
+## Bootstrap confidence intervals
+
+There are many ways to use the bootstrap to compute confidence intervals.
+
+The simplest one is assuming normality of the estimator and uise the standard error to build normal confidence intervals:
+
+```{r}
+ci1 <- qnorm(p=c(.025, .975), 
+            mean=theta0, 
+            sd=sd(law.boot$thetastar))
+ci1
+```
+
+The _bootstrap percentile_ method relies on the quantiles of the bootstrap distribution-
+
+```{r}
+quantile(law.boot$thetastar, c(0.025, 0.975))
+```
+For improved estimators it is preferable to use built-in functions such as those available in packages `boot` or `bootstrap`
+
+
+See for example
+
+[https://www.rdocumentation.org/packages/resample/versions/0.4/topics/CI.percentile](https://www.rdocumentation.org/packages/resample/versions/0.4/topics/CI.percentile)
+
+
+## Bootstraping a multivariate data set (Exercise U-2-I-9)
+
+File `scores5.dat` contains the scores in 5 topics of 88 U.B. students.
+
+1. This data matrix has a $5 \times 5$ variance-covariance matrix with positive eigenvalues $\lambda_{1} >\lambda_{1} > \lambda_{2} > ... > \lambda_{5}$. 
+Let $\theta$ be: 
+$$\theta= \dfrac{\lambda_{1}} {\sum_{i=1}^{n} \lambda_{i}}.$$
+
+$\theta$ is used to represent the percentage of variability explained by the first principal component. 
+
+Let $\hat{\lambda_{1}} >\hat{\lambda_{2}}  > ... > \hat{\lambda_{5}}$ be the eigenvalues of $\widehat{\sum}$, the MLE of $\sum$. From here, by the functional invariance principle of the MLE one has:
+$$\hat{\theta}= \dfrac{\hat{\lambda_{1}}} {\sum_{i=1}^{n} \hat{\lambda_{i}}}$$
+
+### Describe how can one resample the data matrix to obtain an approximation of the bootstrap distribution of $\hat{\theta}$.  Using the process derived above compute a bootstrap estimate of the standard error of $\hat{\theta}$.
+
+
+This is an scenario in which each observation is a multivariate random vector of five components, which corresponds to each row of the data matrix. 
+
+Resampling from the empirical distribution means resampling the data matrix **by rows**, in order to maintain each original observation. 
+
+A bootstrap sample of the data matrix X would be a matrix $X_B$ with the same dimensions than X whose rows would be randomly sampled with replacement from the rows of $X$. 
+
+In this case, we will proceed as follows:
+Repeate B = 1000 times
+1. Create a newly resampled dataset by taking 5 samples with replacement of the _whole_ rows
+2. Compute the covariance matrix on the resampled dataset and then its eigen values $\lambda_{i}^b$, $i=1,...,5$ and then $\hat{\theta}^b= \dfrac{\lambda_{1}^b} {\sum_{i} \lambda_{i}^b}$. 
+3. Finally, we will compute the standard error of $\hat{\theta}$.
+
+```{r}
+datamatrix<-read.delim("scores5.dat")
+covmatrix<-cov(datamatrix)
+ev<-eigen(covmatrix)
+evalues<-ev$values
+theta <- evalues[1]/sum(evalues); theta
+```
+
+```{r}
+set.seed(2)
+n<-1000
+distboot<- rep(NA,n)
+
+for (i in 1:n){
+  bootindexes <- sample ( nrow ( datamatrix ),replace = TRUE )
+  bootmatrix <- datamatrix [ bootindexes ,]
+  covmatrix1<-cov(bootmatrix)
+  ev1<-eigen(covmatrix1)
+  evalues1<-ev1$values
+  distboot[i] <-evalues1[1]/sum(evalues1)
+}
+
+stderrboot <-sqrt(var(distboot)); stderrboot
+```
+
+### Provide a bias corrected estimate of $\theta$.
+
+The bias of an estimator is defined as 
+$$
+b(\hat \theta) = E(\hat \theta)- \theta.
+$$
+Bias can be estimated using the bootstrap as folllows: Thinling of the equivalence of "roles" between real world and bootstrap world we can set
+
+- The role of $\theta$ is played by $\hat \theta$
+- The role of $E(\hat \theta)$ is played by $\widehat{E_B(\hat \theta)}$.
+- The bootstrap bias estimate is then 
+$$
+b_B(\hat \theta) = \widehat{E_B(\hat \theta)}- \hat \theta.
+$$
+
+And the bias corrected estimate of $\theta$ is
+
+$$
+\hat \theta_{BC} = \hat \theta -b_B(\hat \theta)  = 
+2 \hat \theta- \widehat{E_B(\hat \theta)}.
+$$
+
+Finally recall that although these should be exact bootstrap estimates, they can be approximated using Monte Carlo resampling and taking the mean of the resampled vvalues.
+
+$$
+\widehat{E_B(\hat \theta)} \simeq \frac 1B \sum_{b=1}^B \hat \theta^b
+$$
+In our example we would simply do:
+
+```{r}
+Etheta <- mean(distboot);Etheta
+theta <- evalues[1]/sum(evalues);theta
+btheta<- Etheta - theta; btheta
+thetaCB <- 2 *theta - Etheta; thetaCB
+```
+
+Notice that __all results are very similar__. That is in spite of how "reasonable" the approach may seem we may need some theoretical results or some simluation analysis to decide up to what point the bias adjustment improves the estimator.
+
+
+# Introducing permutation tests
+
+One of the most common problems with statistical inference is not being able to verify some assumptions of the assumed model for the data, such as normality.
+
+In these cases, it is usual to consider different alternatives such as non-parametric tests, (which is usually labeled as having little power) or permutations tests.
+
+The logic of a permutations test, which we introduce in a simplified way for the case of a two-group comparison problem, is as follows:
+\begin {enumerate}
+\item Suppose we have obtained two samples of $ n_1 $ observations from a first group and $ n_2 $ observations of a second group respectively.
+\item To estimate the p-value of a hypotesis test:
+  $H_o:\, \mu_1 = \mu_2$ versus $H_1:\, \mu_1 \neq \mu_2$ we must know the
+  probability distribution of the test statistic, which can be
+  the same as that of the two-sample t-test, under the null hypothesis.
+\item Now, we need to realize that, if the null hypothesis were true, the labels we have assigned to individuals as belonging to group 1 and group 2 _have no reason to be_ since all would belong to the same group and would have been left by chance in the sample that we have considered of the first group or that we have considered of the second.
+\item One way to evaluate to what extent this has been so is the following
+\begin {enumerate}
+\item Let's consider all possible permutations of the two samples
+\item On each permutation, the separation between group 1 and group 2 will be performed (for example, the first $ n_1 $ elements of the permuted sample are assigned to group 1 and the remainder to group 2).
+\item After reallocation, the value of the test statistic is calculated.
+\end {enumerate}
+The values of the test statistics calculated on all permutations constitute an approximation to the \emph {the distribution of the test statistic under the null hypotesis (that is: _there are not two groups but one_)}
+so the p-value of the test can be calculated as:
+
+\begin {eqnarray *}
+p & = & P_ {H_0} \left [T \left (\mathbf {X_1}, \mathbf {X_2} \right) \geq T \left (\mathbf {x_1 ^ 0}, \mathbf {x_2 ^ 0} \right) \right] \\
+& = & \frac {\# T \left (\mathbf {X_1}, \mathbf {X_2} \right) \geq T
+\left (\mathbf {x_1 ^ 0}, \mathbf {x_2 ^ 0} \right)} {\mbox {Number of
+permutations}}
+\end {eqnarray *}
+
+In practice, the number of permutations is usually very large, so the above process is carried out in an approximate way, taking a smaller number of random permutations.
+\end {enumerate}
+
+The figure below illustrates the procedure used in a permutations test to compare two samples.
+
+```{r}
+# Do not have the image locally on my machine. 
+#knitr::include_graphics("images/permutationtests.jpg")
+```
+
+## Example
+
+We You want to compare the mean survival time in weeks of two groups of mice affected by liver disease that have been treated with a drug ($z$) or a placebo ($y$). 
+
+The values obtained have been:
+\begin {align *}
+z & = & 94, 197, 16, 38, 99, 141, 23 \\
+y & = & 52, 104, 146, 10, 51, 30, 40, 27, 46.
+\end {align *}
+
+- Implement a permutation test as described above to compare the means
+of the two groups, using a two-sample t-statistic as a test statistic.
+- Apply the implemented test to compare the obtained values.
+Base the estimate of the p-value on 10,000 random permutations.
+- In case you don't want to use a permutation test, what would be an alternative reasonable approach?
+- Compare the results obtained with the alternative suggested with those of the permutation tests. Which one do you think is more appropriate in this case?
+  What are the advantages or disadvantages of each of them?
+
+
+### Building a permutations distribution
+
+```{r}
+tr <- c( 94, 197, 16, 38, 99, 141, 23)
+y <- c( 52, 104, 146, 10, 51, 30, 40, 27, 46)
+testInSample<- mean(tr) - mean(y)
+```
+The difference in means is ```{r} testInSample```
+
+To obtain a single permutation of the data, we combine the data and then sample without replacement two "mock" tr and y vectors.
+
+```{r}
+testFun<- function(x1,x2){
+  mean(x2)-mean(x1)
+}
+nt<- length(tr)
+ny<- length(y)
+N<- nt+ny
+s <- sample(c(tr, y), N, FALSE)
+trp <- s[1:nt]
+yp <- s[(nt+1):N]
+testFun(yp, trp)
+```
+
+If we repeat this process a large number of times, we can build our approximate permutation distribution (i.e., the sampling distribution for the mean-difference). 
+
+The result will be a vector of the differences from each permutation (i.e., our distribution):
+
+```{r}
+NPerm <- 2000
+testValues <- numeric(NPerm)
+for (i in 1:NPerm){
+  permutedS<- sample(s, N, FALSE)
+  trp <- permutedS[1:nt]
+  yp <- permutedS[(nt+1):N]
+  testValues[i]<- testFun(yp, trp)
+}
+summary(testValues)
+```
+
+
+We can look at our distribution using hist and draw a vertical line for our observed difference:
+
+```{r}
+par(mfrow=c(1,1))
+hist(testValues)
+abline(v = testInSample, col = "blue", lwd = 2)
+```
+
+### Relying on pre-built packages
+
+We don't always need to build our own permutation distributions (though it is good to know how to do it). R provides a package to conduct permutation tests called coin. We can compare our p-value (and associated inference) from above with the result from `coin`.
+

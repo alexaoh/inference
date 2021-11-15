@@ -79,16 +79,18 @@ df
 # The bootstrap means are very similar to the sample means.
 
 # Also done with a library.
-library(boot)
-mean.func <- function(data, i){
+library(bootstrap)
+mean.func <- function(data){
   return(mean(data))
 }
 set.seed(1)
-boot(only.Math, statistic = mean.func, R = B)
-set.seed(1)
-boot(only.Social, statistic = mean.func, R = B)
+bMath <- bootstrap::bootstrap(only.Math, nboot = B, theta = mean.func)
+mean(bMath$thetastar)
+bSoc <- bootstrap::bootstrap(only.Social, nboot = B, theta = mean.func)
+mean(bSoc$thetastar)
 
-# How can I describe the distributions?
+
+# How can I describe the distributions? See histograms. 
 
 # c) Bootstrap the ratio of means and provide an estimate of the standard error of the ratio.
 B <- 10000
@@ -97,17 +99,17 @@ set.seed(1)
 for (i in 1:B){
   Math.resample <- sample(only.Math, replace = T)
   Social.resample <- sample(only.Social, replace = T)
-  ratio.resample <- Math.resample/Social.resample
   mean.math <- mean(Math.resample)
   mean.social <- mean(Social.resample)
   b.ratio.means[i] <- mean.math/mean.social 
-  #b.ratio.means[i] <- mean(ratio.resample)
 }
 (boot.ratio.mean <- mean(b.ratio.means))
 (boot.ratio.sd <- sd(b.ratio.means))
 boot.mean.Math/boot.mean.Social
 hist(b.ratio.means, breaks = 100)
 abline(v=c(1.17, 2.4))
+abline(v=boot.ratio.mean, col = "blue")
+abline(v=c(1.58, 1.87))
 
 # d) 95% confidence intervals for the ratio of means using the "percentile" and the "studentized" methods. 
 # Interpret the intervals. 
@@ -121,28 +123,37 @@ abline(v=c(1.17, 2.4))
 # Confidence interval via the studentized method. Need to estimate the quantiles. 
 set.seed(1)
 B <- 1000
-se.resample <- rep(0, B)
+N <- 100
+z <- rep(NA, B)
 for (i in 1:B){
   Math.resample <- sample(only.Math, replace = T)
   Social.resample <- sample(only.Social, replace = T) 
-  ratio.resample <- Math.resample/Social.resample # Gir dette mening når de ikke er like lange!?
   mean.math <- mean(Math.resample)
   mean.social <- mean(Social.resample)
   b.ratio.means[i] <- mean.math/mean.social  
-  #b.ratio.means[i] <- mean(ratio.resample)
-  # These two obviously give different results! Which is correct!?
-  # Need to estimate SE also.
-  for (i in 1:500){
-    # I think this looks incorrect! How can I estimate the standard error of the estimate of the ratio of means?
-    se.resample[i] <- sd(Math.resample)/sd(Social.resample)
-    #se.resample[i] <- sd(sample(ratio.resample, replace = T))
+  se.resample <- rep(NA, N)
+  for (j in 1:N){
+    se.resample[j] <- mean(sample(Math.resample, replace = T))/mean(sample(Social.resample, replace = T))
   }
+  z[i] <- sd(se.resample)
+  #z[i] <- (b.ratio.means[i]-boot.ratio.mean)/sd(se.resample)
 }
-(boot.ratio.mean <- mean(b.ratio.means))
-(boot.ratio.sd <- sd(b.ratio.means))
-z <- sd(se.resample)
-hist(se.resample)
+(mean(b.ratio.means))
+(sd(b.ratio.means))
+hist(z)
 (ciStudentized <- c(boot.ratio.mean - quantile(z, 0.025)*boot.ratio.sd, boot.ratio.mean + quantile(z, 0.975)*boot.ratio.sd))
+# Tror ikke dette er rett! Virker veldig smalt!
+
+# With a package. Får ikke disse til å fungere!? Usikker på hvordan APIet fungerer.
+library(boot)
+theta <- function(data, i){
+  mean(data[data$Area == "Math & Science", "Price"][i]/data[data$Area == "Social Sciences", "Price"][i])
+}
+boot(data, theta, R = B)
+theta2 <- function(i){
+  mean(data[data$Area == "Math & Science", "Price"][i]/data[data$Area == "Social Sciences", "Price"][i])
+}
+bootstrap::bootstrap(data, nboot = B, theta = theta2)
 
 # e) Permutation test to compare the two bootstrap means. 
 (diff.boot.means <- boot.mean.Math - boot.mean.Social) # First find the difference of means. 
@@ -150,7 +161,8 @@ perms <- 10000
 diffs <- rep(1, perms)
 for (i in 1:perms){
   s <- sample(data[, "Price"]) # Sample from the combined population.
-  diffs[i] <- mean(s[1:27]) - mean(s[27:44]) # Keep 27 in Math and 17 in Social. 
+  diffs[i] <- mean(s[1:27]) - mean(s[28:44]) # Keep 27 in Math and 17 in Social. 
+  # Burde også bytte ut 27 med length(area = Math & Science).
 }
 
 # The null hypothesis looks to not hold that well.
@@ -158,7 +170,6 @@ hist(diffs, breaks = 100)
 abline(v=diff.boot.means, col = "red", lty = 2)
 
 # Calculate the p-value. Evidence against null hypothesis I would say, which means that the ratios are different. 
-(p_value <- (sum(diffs >= diff.boot.means))/length(diffs))
+(p_value <- (sum(diffs >= diff.boot.means) + sum(diffs <= -diff.boot.means))/perms)
 
 # Compare the result from the permutation test to an alternative based on a non-parametric test (bootstrap tests?)
-
