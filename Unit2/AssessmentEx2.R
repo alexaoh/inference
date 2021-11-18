@@ -147,9 +147,11 @@ hist(z)
 # With a package. Får ikke disse til å fungere!? Usikker på hvordan APIet fungerer.
 library(boot)
 theta <- function(data, i){
-  mean(data[data$Area == "Math & Science", "Price"][i]/data[data$Area == "Social Sciences", "Price"][i])
+  m1 <- mean((data %>% filter(Area == "Math & Science") %>% pull(Price))[i])
+  m2 <- mean((data %>% filter(Area == "Social Sciences") %>% pull(Price))[j])
+  return(m1/m2)
 }
-boot(data, theta, R = B)
+boot(books, theta, R = B)
 theta2 <- function(i){
   mean(data[data$Area == "Math & Science", "Price"][i]/data[data$Area == "Social Sciences", "Price"][i])
 }

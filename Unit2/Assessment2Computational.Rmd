@@ -1,0 +1,275 @@
+---
+title: "Computational Part of Assessment Exercises"
+subtitle: "Advanced Statistical Inference - Unit 2"
+author: "Alexander J Ohrt"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_depth: 3
+    theme: readable
+    highlight: textmate
+    number_sections: false
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("/home/ajo/gitRepos/inference/Unit2")
+library(bootstrap)
+library(dplyr)
+library(boot)
+library(resample)
+```
+
+## Problem 1
+
+Modelling service times is one area of research in queuing theory. We are given a data set with service times for 174 customers. The distribution of service times is modelled using the one parameter Weibull distribution, which has the pdf
+
+\begin{equation}
+  f(x) = \frac{2x}{\theta}e^{-x^2/\theta}I_{(0,\infty)}(x). 
+\end{equation}
+
+### a) 
+
+A plot of the empirical cdf overimposed on the theoretical distribution function is shown below. 
+
+```{r, results = "hide"}
+data <- read.csv("Service.csv") 
+str(data)
+head(data)
+summary(data)
+```
+
+
+```{r}
+x <- seq(0, max(data$Times), by = 0.001) 
+plot.ecdf(data$Times) 
+lines(x, pweibull(x, shape = 2, scale = sqrt(mean(data$Times^2))), lty = 2, col = "blue", lwd = 3) # MLE estimator for theta..
+lines(x, pweibull(x, shape = 2, scale = 2*mean(data$Times)/sqrt(pi)), lty = 3, col = "red", lwd = 3) # MOM-estimator for theta. 
+legend("topleft", legend = c("MLE", "MOM"), lty = 3:2, col = c("blue", "red"))
+```
+
+The fit looks alright I suppose. **But how can I overimpose the theoretical distribution on the cdf when I do not know the parameters?**
+
+### b) 
+
+A goodness-of-fit test is done to test whether the Weibull distribution is an adequate model for these data. 
+**What goodness-of-fit measure can be used?**
+
+The rest of the problem has been typeset in the other pdf. 
+
+## Problem 2
+
+Two researchers collected data on the price of hardcover textbooks from two disciplinary areas: Mathematics and the Natural Sciences and the Social Sciences. 
+
+```{r, results = "hide"}
+books <- read.csv("bookprices.csv")
+head(books)
+str(books)
+summary(books)
+books$areaFact <- as.factor(books$Area)
+```
+
+### a)
+
+Some exploratory data analysis on book prices for each of the two areas is done. 
+
+```{r}
+only.Math <- books[books$Area == "Math & Science", "Price"] # Only Math book prices. 
+s.math <- summary(only.Math)
+hist(only.Math, breaks = 20, xlab = "Math & Science Books", main = "Histogram of Math & Science Books")
+
+only.Social <- books[books$Area == "Social Sciences", "Price"] # Only Social book prices. 
+s.soc <- summary(only.Social)
+hist(only.Social, breaks = 20, xlab = "Social Sciences Books", main = "Histogram of Social Sciences Books")
+
+df <- cbind(s.math, s.soc)
+colnames(df) <- c("Math & Science", "Social Sciences") 
+df <- rbind(df, "Std. Err." = c(sd(only.Math), sd(only.Social)), "Sum" = c(sum(only.Math), sum(only.Social)), 
+            "Books" = c(as.integer(length(only.Math)), as.integer(length(only.Social))))
+df
+```
+
+At first glance at the summary above, the price in the two areas look quite different. This might suggest that there is a different in prices in general between the two areas. All the quantiles are lower in the Social Sciences compared to Math \& Science, which might suggest that prices on many books are lower in the former area compared to the latter area. Note that there are a different amount of books from each area in the data set and that the total sum of prices is different. 
+
+### b) 
+
+A Bootstrap for the mean of book prices for each area is done below. 
+
+```{r}
+B <- 10000
+b.means.Math <- rep(NA, B)
+set.seed(1)
+for (i in 1:B){
+  b.means.Math[i] <- mean(sample(only.Math, replace = T))
+}
+
+boot.mean.Math <- mean(b.means.Math)
+boot.sd.Math <- sd(b.means.Math)
+
+rbind("Estimation of Bootstrap Mean" = boot.mean.Math, "Estimation of Bootstrap Std. Err" = boot.sd.Math)
+```
+
+```{r}
+hist(b.means.Math, breaks = 100, probability = T, main = "Bootstrap Math & Science", xlab = "Esimated Bootstrap Means")
+x <- seq(130, 180, by = 1)
+lines(x, dnorm(x, mean = boot.mean.Math, sd = boot.sd.Math), col = "blue", lty = 2)
+abline(v = boot.mean.Math, col = "red", lty = 1)
+legend("topright", legend = c("N(Mean Boot, Std. Err Boot)", "Mean Boot"), col = c("blue", "red"), lty = 2:1)
+```
+
+A normal distribution with the estimated bootstrap mean and standard error is added to the histogram above. Thus, we can see that the distribution of the bootstrap means resembles this normal distribution. 
+
+```{r}
+b.means.Social <- rep(NA, B)
+set.seed(1)
+for (i in 1:B){
+  b.means.Social[i] <- mean(sample(only.Social, replace = T))
+}
+boot.mean.Social <- mean(b.means.Social)
+boot.sd.Social <- sd(b.means.Social)
+
+rbind("Estimation of Bootstrap Mean" = boot.mean.Social, "Estimation of Bootstrap Std. Err" = boot.sd.Social)
+```
+
+```{r}
+hist(b.means.Social, breaks = 100, probability = T, main = "Bootstrap Social Sciences", xlab = "Esimated Bootstrap Means")
+x <- seq(30, 160, by = 1)
+lines(x, dnorm(x, mean = boot.mean.Social, sd = boot.sd.Social), col = "blue", lty = 2)
+abline(v = boot.mean.Social, col = "red", lty = 1)
+legend("topright", legend = c("N(Mean Boot, Std. Err Boot)", "Mean Boot"), col = c("blue", "red"), lty = 2:1)
+```
+
+Similarly to the case of Math \& Science, a normal distribution with the estimated bootstrap mean and standard error is added to the histogram above. Thus, we can see that the distribution of the bootstrap means resembles this normal distribution. 
+
+A summary of the bootstrapped means is given below. Also, the summary from a) is plotted again. 
+
+```{r}
+df.means <- cbind("Math & Science" = boot.mean.Math, "Social Sciences" = boot.mean.Social)
+rownames(df.means) <- "Bootstrap Means"
+df.means
+df
+```
+
+It is apparent that the sample means are similar to the estimations of the bootstrap means. 
+
+Below the bootstrap has been done with a package, which gives the same results as when done manually. 
+
+```{r}
+set.seed(1)
+bMath <- bootstrap::bootstrap(only.Math, nboot = B, theta = mean)
+mean(bMath$thetastar)
+set.seed(1)
+bSoc <- bootstrap::bootstrap(only.Social, nboot = B, theta = mean)
+mean(bSoc$thetastar)
+```
+
+### c) 
+
+The ratio of means is bootstrapped in this problem and an estimate of the standard error of the ratio is provided. 
+
+```{r}
+B <- 10000
+b.ratio.means <- rep(NA, B)
+set.seed(1)
+for (i in 1:B){
+  #ind1 <- sample(1:27, replace = T)
+  Math.resample <- sample(only.Math, replace = T)
+  #Math.resample <- only.Math[ind1]
+  #ind2 <- sample(1:17, replace = T)
+  Social.resample <- sample(only.Social, replace = T)
+  #Social.resample <- only.Social[ind2]
+  mean.math <- mean(Math.resample)
+  mean.social <- mean(Social.resample)
+  b.ratio.means[i] <- mean.math/mean.social 
+}
+boot.ratio.mean <- mean(b.ratio.means)
+boot.ratio.sd <- sd(b.ratio.means)
+
+rbind("Estimation of Bootstrap Ratio of Means" = boot.ratio.mean, "Estimation of Bootstrap Std. Err of Ratio" = boot.ratio.sd)
+```
+
+The ratio of means in the sample is `r round(boot.mean.Math/boot.mean.Social, 6)`, which, again, is relatively similar to the estimated bootstrap ratio of means. 
+
+Below, I have again tried to bootstrap with a package, but I get different results. ***WHY!? NEED to get this to work to be able to find the confidence intervals below via a library as well!***
+
+```{r}
+theta <- function(i, j){
+  m1 <- mean((books %>% filter(Area == "Math & Science") %>% pull(Price))[i])
+  m2 <- mean((books %>% filter(Area == "Social Sciences") %>% pull(Price))[j])
+  return(m1/m2)
+}
+set.seed(1)
+j <- 1:length(only.Social)
+b.ratio <- bootstrap::bootstrap(1:length(only.Math), nboot = 10, theta = theta, j)
+mean(b.ratio$thetastar)
+sd(b.ratio$thetastar)
+
+# Prøv med boot-library i stedet, for da kan jeg bruke boot.ci i d) som gir begge CI jeg vil ha!
+```
+
+### d) 
+
+95\% confidence intervals for the ratio of means are found using the "percentile" and the "studentized" method. 
+
+A confidence interval with the "percentile" method is given below. 
+
+```{r}
+(ciPercentile <- quantile(b.ratio.means, c(0.025, 0.975)))
+#CI.percentile(b.ratio$thetastar) Denne kommer fra resample libraryen
+```
+
+A confidence interval with the "studentized" method is given below. 
+
+```{r}
+set.seed(1)
+B <- 1000
+N <- 100
+z <- rep(NA, B)
+for (i in 1:B){
+  Math.resample <- sample(only.Math, replace = T)
+  Social.resample <- sample(only.Social, replace = T) 
+  mean.math <- mean(Math.resample)
+  mean.social <- mean(Social.resample)
+  b.ratio.means[i] <- mean.math/mean.social  
+  se.resample <- rep(NA, N)
+  for (j in 1:N){
+    se.resample[j] <- mean(sample(Math.resample, replace = T))/mean(sample(Social.resample, replace = T))
+  }
+  z[i] <- sd(se.resample)
+  #z[i] <- (b.ratio.means[i]-boot.ratio.mean)/sd(se.resample)
+}
+(mean(b.ratio.means))
+(sd(b.ratio.means))
+hist(z)
+(ciStudentized <- c(boot.ratio.mean - quantile(z, 0.025)*boot.ratio.sd, boot.ratio.mean + quantile(z, 0.975)*boot.ratio.sd))
+```
+
+**Ønsker å sjekke dette via libraryene også!!!!! library(boot) er den jeg må få til å funke, for der kan jeg bruke boot.ci i denne oppgaven etterpå!**
+
+### e) 
+
+A permutation test to compare the two bootstrap means is built in this problem. It is applied to the data and the result is compared with an alternative based on a non-parametric test
+
+```{r}
+(diff.boot.means <- boot.mean.Math - boot.mean.Social) # First find the difference of means. 
+perms <- 10000
+diffs <- rep(1, perms)
+for (i in 1:perms){
+  s <- sample(books[, "Price"]) # Sample from the combined population.
+  diffs[i] <- mean(s[1:27]) - mean(s[28:44]) # Keep 27 in Math and 17 in Social. 
+  # Burde også bytte ut 27 med length(area = Math & Science).
+}
+
+# The null hypothesis looks to not hold that well.
+hist(diffs, breaks = 100)
+abline(v=diff.boot.means, col = "red", lty = 2)
+
+# Calculate the p-value. Evidence against null hypothesis I would say, which means that the ratios are different. 
+(p_value <- (sum(diffs >= diff.boot.means) + sum(diffs <= -diff.boot.means))/perms)
+```
+
+**Sjekk med en permutation test pakke også! (perm) Som alternativ tests: Kan bruke Wilcox (? (fra stat4BusMan?) Eller en test basert på bootstrap? **
