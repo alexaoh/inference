@@ -22,6 +22,7 @@ library(bootstrap)
 library(dplyr)
 library(boot)
 library(resample)
+library(perm)
 ```
 
 ## Problem 1
@@ -165,6 +166,20 @@ mean(bMath$thetastar)
 set.seed(1)
 bSoc <- bootstrap::bootstrap(only.Social, nboot = B, theta = mean)
 mean(bSoc$thetastar)
+
+
+mean.func <- function(data, i){
+  return(mean(data[i]))
+}
+set.seed(1)
+bm2 <- boot::boot(only.Math, mean.func, R = B)
+bm2
+mean(bm2$t)
+
+set.seed(1)
+bs2 <- boot::boot(only.Social, mean.func, R = B)
+bs2
+mean(bs2$t)
 ```
 
 ### c) 
@@ -172,16 +187,12 @@ mean(bSoc$thetastar)
 The ratio of means is bootstrapped in this problem and an estimate of the standard error of the ratio is provided. 
 
 ```{r}
-B <- 10000
+B <- 5000
 b.ratio.means <- rep(NA, B)
 set.seed(1)
 for (i in 1:B){
-  #ind1 <- sample(1:27, replace = T)
   Math.resample <- sample(only.Math, replace = T)
-  #Math.resample <- only.Math[ind1]
-  #ind2 <- sample(1:17, replace = T)
   Social.resample <- sample(only.Social, replace = T)
-  #Social.resample <- only.Social[ind2]
   mean.math <- mean(Math.resample)
   mean.social <- mean(Social.resample)
   b.ratio.means[i] <- mean.math/mean.social 
@@ -194,21 +205,31 @@ rbind("Estimation of Bootstrap Ratio of Means" = boot.ratio.mean, "Estimation of
 
 The ratio of means in the sample is `r round(boot.mean.Math/boot.mean.Social, 6)`, which, again, is relatively similar to the estimated bootstrap ratio of means. 
 
-Below, I have again tried to bootstrap with a package, but I get different results. ***WHY!? NEED to get this to work to be able to find the confidence intervals below via a library as well!***
+Below, the estimated bootstrap ratio of means is found with a library. The variances of each of the bootstrap estimations are also estimated, such that they can be used to calculate Studentized confidence intervals below. 
 
 ```{r}
-theta <- function(i, j){
-  m1 <- mean((books %>% filter(Area == "Math & Science") %>% pull(Price))[i])
-  m2 <- mean((books %>% filter(Area == "Social Sciences") %>% pull(Price))[j])
-  return(m1/m2)
-}
-set.seed(1)
-j <- 1:length(only.Social)
-b.ratio <- bootstrap::bootstrap(1:length(only.Math), nboot = 10, theta = theta, j)
-mean(b.ratio$thetastar)
-sd(b.ratio$thetastar)
+N <- 500 # Iterations for Bootstrap estimate of variance. 
+new.book.data <- cbind(c(only.Math, only.Social), c(rep(1,times=27), rep(2, times = 17)))
+colnames(new.book.data) <- c("Price", "Area")
 
-# Prøv med boot-library i stedet, for da kan jeg bruke boot.ci i d) som gir begge CI jeg vil ha!
+theta2 <- function(data, i){
+  area <- data[i, 2]
+  price <- data[i, 1]
+  return(mean(price[area==1])/mean(price[area==2]))
+}
+
+theta3 <- function(data, i){
+  area <- data[i, 2]
+  price <- data[i, 1]
+  b <- boot::boot(data, theta2, R = N)
+  c(mean(price[area==1])/mean(price[area==2]), var(b$t))
+}
+
+set.seed(1)
+b <- boot::boot(new.book.data, theta3, R = B, strata = new.book.data[,2])
+b
+mean(b$t[,1])
+mean(b$t[,2])
 ```
 
 ### d) 
@@ -218,50 +239,64 @@ sd(b.ratio$thetastar)
 A confidence interval with the "percentile" method is given below. 
 
 ```{r}
-(ciPercentile <- quantile(b.ratio.means, c(0.025, 0.975)))
-#CI.percentile(b.ratio$thetastar) Denne kommer fra resample libraryen
+# Ratio in sample.
+sample.ratio <- mean(only.Math)/mean(only.Social) 
+(ciPercentile <- quantile(b.ratio.means, c(0.025, 0.975))) #Quantile.
+quantile(b$t[,1], c(0.025, 0.975))
+
+c(2*sample.ratio - quantile(b.ratio.means, 0.975), 2*sample.ratio - quantile(b.ratio.means, 0.025)) # Basic!
+c(2*sample.ratio - quantile(b$t[,1], 0.975), 2*sample.ratio - quantile(b$t[,1], 0.025)) # Basic!
+
+# Normal, for comparison. 
+(ciNorm <- qnorm(p=c(.025, .975), mean=sample.ratio, sd=boot.ratio.sd))
+(ciNorm <- qnorm(p=c(.025, .975), mean=sample.ratio, sd=mean(sqrt(b$t[,2]))))
 ```
 
 A confidence interval with the "studentized" method is given below. 
 
 ```{r}
 set.seed(1)
-B <- 1000
-N <- 100
 z <- rep(NA, B)
+variances <- rep(NA, B)
 for (i in 1:B){
   Math.resample <- sample(only.Math, replace = T)
   Social.resample <- sample(only.Social, replace = T) 
   mean.math <- mean(Math.resample)
   mean.social <- mean(Social.resample)
   b.ratio.means[i] <- mean.math/mean.social  
-  se.resample <- rep(NA, N)
-  for (j in 1:N){
-    se.resample[j] <- mean(sample(Math.resample, replace = T))/mean(sample(Social.resample, replace = T))
-  }
-  z[i] <- sd(se.resample)
-  #z[i] <- (b.ratio.means[i]-boot.ratio.mean)/sd(se.resample)
+  new.d <- cbind(c(Math.resample, Social.resample), c(rep(1,times=27), rep(2, times = 17)))
+  # se.resample <- rep(NA, N)
+  # for (j in 1:N){ # Could bootstrap the b.ratio.means here to calculate the sd perhaps? (replacing this loop)
+  #   se.resample[j] <- mean(sample(Math.resample, replace = T))/mean(sample(Social.resample, replace = T))
+  # }
+
+  boot.se <- boot::boot(new.d, theta2, R = N, strata = new.d[,2])
+  #variances[i] <- var(se.resample) 
+  variances[i] <- var(boot.se$t) 
+  z[i] <- (b.ratio.means[i]-sample.ratio)/sd(boot.se$t)
+  #z[i] <- (b.ratio.means[i]-sample.ratio)/sd(se.resample)
 }
 (mean(b.ratio.means))
 (sd(b.ratio.means))
-hist(z)
-(ciStudentized <- c(boot.ratio.mean - quantile(z, 0.025)*boot.ratio.sd, boot.ratio.mean + quantile(z, 0.975)*boot.ratio.sd))
+(ciStudentized <- c(sample.ratio - quantile(z, 0.975)*boot.ratio.sd, sample.ratio - quantile(z, 0.025)*boot.ratio.sd))
+boot.ci(b) 
+mean(variances)
 ```
 
-**Ønsker å sjekke dette via libraryene også!!!!! library(boot) er den jeg må få til å funke, for der kan jeg bruke boot.ci i denne oppgaven etterpå!**
+The results when using the bootstrap package compared to coding the studentized confidence interval manually are quite different. **Surely I am misunderstanding the formula for calculating the studentized CI. Have I used the "correct parts" in the formula above?**
 
 ### e) 
 
-A permutation test to compare the two bootstrap means is built in this problem. It is applied to the data and the result is compared with an alternative based on a non-parametric test
+A permutation test to compare the two bootstrap means is built in this problem. It is applied to the data and the result is compared with an alternative based on a non-parametric test.
 
 ```{r}
 (diff.boot.means <- boot.mean.Math - boot.mean.Social) # First find the difference of means. 
 perms <- 10000
 diffs <- rep(1, perms)
+set.seed(1)
 for (i in 1:perms){
   s <- sample(books[, "Price"]) # Sample from the combined population.
-  diffs[i] <- mean(s[1:27]) - mean(s[28:44]) # Keep 27 in Math and 17 in Social. 
-  # Burde også bytte ut 27 med length(area = Math & Science).
+  diffs[i] <- mean(s[1:27]) - mean(s[28:44]) # Keep 27 in Math and 17 in Social. .
 }
 
 # The null hypothesis looks to not hold that well.
@@ -270,6 +305,19 @@ abline(v=diff.boot.means, col = "red", lty = 2)
 
 # Calculate the p-value. Evidence against null hypothesis I would say, which means that the ratios are different. 
 (p_value <- (sum(diffs >= diff.boot.means) + sum(diffs <= -diff.boot.means))/perms)
+
+# Computed with a library, not sure how it finds Z.
+set.seed(1)
+p1 <- permTS(b.means.Math, b.means.Social)
+p1
+
+# Another non-parametric test. 
+t <- wilcox.test(b.means.Math, b.means.Social)
+t # This gives the same conclusion at least. 
 ```
 
-**Sjekk med en permutation test pakke også! (perm) Som alternativ tests: Kan bruke Wilcox (? (fra stat4BusMan?) Eller en test basert på bootstrap? **
+** Som alternativ tests: Kan bruke Wilcox (? (fra stat4BusMan?) Eller en test basert på bootstrap? **
+
+### f) 
+
+Are the answers to the previous questions consistent? The tests done in e) indicate that the means of the two areas are statistically different. The estimate of the bootstrap ratio of the means also indicates the same, since the ratio is estimated to `r boot.ratio.mean` and the standard error of this estimate is estimated to `r boot.ratio.sd`. However, some of the confidence intervals built from the bootstrap estimates give rise to the opposite conclusion; that the means are not statistically different. This is seen from the Studentized confidence interval for instance, which contains the value 1 inside the interval, which means that we cannot be confident that the ratio is different from 1. Thus, I would conclude that all answers in this problem are not consistent. **Given that I have calculated the studentized confidence interval correctly!**
