@@ -23,6 +23,8 @@ library(dplyr)
 library(boot)
 library(resample)
 library(perm)
+library(dgof)
+library(fitdistrplus)
 ```
 
 ## Problem 1
@@ -47,10 +49,18 @@ summary(data)
 
 ```{r}
 x <- seq(0, max(data$Times), by = 0.001) 
+Emp.CDF <- ecdf(data$Times)
 plot.ecdf(data$Times) 
-lines(x, pweibull(x, shape = 2, scale = sqrt(mean(data$Times^2))), lty = 2, col = "blue", lwd = 3) # MLE estimator for theta..
-lines(x, pweibull(x, shape = 2, scale = 2*mean(data$Times)/sqrt(pi)), lty = 3, col = "red", lwd = 3) # MOM-estimator for theta. 
-legend("topleft", legend = c("MLE", "MOM"), lty = 3:2, col = c("blue", "red"))
+MLE <- mean(data$Times^2)
+MME <- 4*mean(data$Times)^2/pi
+lines(x, pweibull(x, shape = 2, scale = sqrt(MLE)), lty = 2, col = "blue", lwd = 3) # MLE estimator for theta.
+lines(x, pweibull(x, shape = 2, scale = sqrt(MME)), lty = 3, col = "red", lwd = 3) # MOM-estimator for theta. 
+legend("topleft", legend = c("MLE", "MME"), lty = 2:3, col = c("blue", "red"))
+
+fit.weibull <- fitdist(data$Times, distr = "weibull") # the shape parameter should be fixed at 2!
+lines(x, pweibull(x, shape = fit.weibull$estimate[[1]], scale = fit.weibull$estimate[[2]]), lty = 2, col = "green", lwd = 3) 
+# https://www.rdocumentation.org/packages/fitdistrplus/versions/1.1-6/topics/fitdist
+# https://www.google.com/search?channel=fs&client=ubuntu&q=fitdist+weibull+fix+shape+parameter+before+maximization
 ```
 
 The fit looks alright I suppose. **But how can I overimpose the theoretical distribution on the cdf when I do not know the parameters?**
@@ -59,6 +69,23 @@ The fit looks alright I suppose. **But how can I overimpose the theoretical dist
 
 A goodness-of-fit test is done to test whether the Weibull distribution is an adequate model for these data. 
 **What goodness-of-fit measure can be used?**
+
+Kolmogorov-Smirnov test can be used (test statistic is like Glivenko-Cantelli (whatever that means!))
+
+```{r}
+# Kolmogorov-Smirnov Test for each of the weibulls above. 
+MLE.gof <- ks.test(data$Times, "pweibull", shape = 2, scale = sqrt(MLE))
+MLE.gof
+
+MME.gof <- ks.test(data$Times, "pweibull", shape = 2, scale = sqrt(MME))
+MME.gof
+
+# https://stackoverflow.com/questions/51987605/problems-with-ks-test-and-ties
+# https://stats.stackexchange.com/questions/232011/ties-should-not-be-present-in-one-sample-kolmgorov-smirnov-test-in-r
+# https://www.rdocumentation.org/packages/dgof/versions/1.2/topics/ks.test
+# https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test
+```
+
 
 The rest of the problem has been typeset in the other pdf. 
 
@@ -94,11 +121,11 @@ df <- rbind(df, "Std. Err." = c(sd(only.Math), sd(only.Social)), "Sum" = c(sum(o
 df
 ```
 
-At first glance at the summary above, the price in the two areas look quite different. This might suggest that there is a different in prices in general between the two areas. All the quantiles are lower in the Social Sciences compared to Math \& Science, which might suggest that prices on many books are lower in the former area compared to the latter area. Note that there are a different amount of books from each area in the data set and that the total sum of prices is different. 
+At first glance at the summary above, the price in the two areas look quite different. This might suggest that there is a difference in prices in general between the two areas. All the quantiles are lower in the Social Sciences compared to Math \& Science, which might suggest that prices on many books are lower in the former area compared to the latter area. Note that there are a different amount of books from each area in the data set and that the total sum of prices is different. 
 
 ### b) 
 
-A Bootstrap for the mean of book prices for each area is done below. 
+A Bootstrap for the mean of book prices in each area is done below. 
 
 ```{r}
 B <- 10000
@@ -122,7 +149,7 @@ abline(v = boot.mean.Math, col = "red", lty = 1)
 legend("topright", legend = c("N(Mean Boot, Std. Err Boot)", "Mean Boot"), col = c("blue", "red"), lty = 2:1)
 ```
 
-A normal distribution with the estimated bootstrap mean and standard error is added to the histogram above. Thus, we can see that the distribution of the bootstrap means resembles this normal distribution. 
+A normal distribution function with the estimated bootstrap mean and standard error is added to the histogram above. Thus, we can see that the distribution of the bootstrap means resembles this normal distribution. 
 
 ```{r}
 b.means.Social <- rep(NA, B)
@@ -144,7 +171,7 @@ abline(v = boot.mean.Social, col = "red", lty = 1)
 legend("topright", legend = c("N(Mean Boot, Std. Err Boot)", "Mean Boot"), col = c("blue", "red"), lty = 2:1)
 ```
 
-Similarly to the case of Math \& Science, a normal distribution with the estimated bootstrap mean and standard error is added to the histogram above. Thus, we can see that the distribution of the bootstrap means resembles this normal distribution. 
+Similarly to the case of Math \& Science, a normal distribution function with the estimated bootstrap mean and standard error is added to the histogram above. Thus, we can see that the distribution of the bootstrap means resembles this normal distribution. 
 
 A summary of the bootstrapped means is given below. Also, the summary from a) is plotted again. 
 
@@ -155,19 +182,11 @@ df.means
 df
 ```
 
-It is apparent that the sample means are similar to the estimations of the bootstrap means. 
+It is apparent that the sample means are relatively similar to the estimations of the bootstrap means. 
 
 Below the bootstrap has been done with a package, which gives the same results as when done manually. 
 
 ```{r}
-set.seed(1)
-bMath <- bootstrap::bootstrap(only.Math, nboot = B, theta = mean)
-mean(bMath$thetastar)
-set.seed(1)
-bSoc <- bootstrap::bootstrap(only.Social, nboot = B, theta = mean)
-mean(bSoc$thetastar)
-
-
 mean.func <- function(data, i){
   return(mean(data[i]))
 }
@@ -205,7 +224,7 @@ rbind("Estimation of Bootstrap Ratio of Means" = boot.ratio.mean, "Estimation of
 
 The ratio of means in the sample is `r round(boot.mean.Math/boot.mean.Social, 6)`, which, again, is relatively similar to the estimated bootstrap ratio of means. 
 
-Below, the estimated bootstrap ratio of means is found with a library. The variances of each of the bootstrap estimations are also estimated, such that they can be used to calculate Studentized confidence intervals below. 
+Below, the estimated bootstrap ratio of means is found with a library. The variances of each of the bootstrap estimations are also estimated, using the bootstrap, such that they can be used to calculate "studentized" confidence intervals in problem d). The results are probably different from the results obtained above because of differences in seeds used when sampling in each iteration.
 
 ```{r}
 N <- 500 # Iterations for Bootstrap estimate of variance. 
@@ -221,43 +240,52 @@ theta2 <- function(data, i){
 theta3 <- function(data, i){
   area <- data[i, 2]
   price <- data[i, 1]
-  b <- boot::boot(data, theta2, R = N)
+  #b <- boot::boot(data, theta2, R = N, strata = data[,2]) 
+  b <- boot::boot(data[i,], theta2, R = N, strata = data[i,2]) # Her har jeg lagt inn data[i, ]! Husk at dette gir noe annet!
+  # Gir dette mening da? TENK! Må jo resample fra resamplene, så synes dette gir mer mening! (usikker på formelen i libraryen her,
+  # men det stemmer bedre med hva jeg gjore manuelt i funksjonen nedenfor!) Tror dette gir mest mening derfor!
+  # Finn ut hvilket svar jeg burde få og velge hvilket av alternativene som stemmer deretter!
   c(mean(price[area==1])/mean(price[area==2]), var(b$t))
 }
 
 set.seed(1)
-b <- boot::boot(new.book.data, theta3, R = B, strata = new.book.data[,2])
-b
-mean(b$t[,1])
-mean(b$t[,2])
+(b <- boot::boot(new.book.data, theta3, R = B, strata = new.book.data[,2]))
 ```
+
+The estimated bootstrap ratio of means with the library is 
+
+```{r}
+mean(b$t[,1])
+```
+
 
 ### d) 
 
+**Velg den som gir mest mening, og velg tilsvarende valg i theta3 over!**
+
 95\% confidence intervals for the ratio of means are found using the "percentile" and the "studentized" method. 
 
-A confidence interval with the "percentile" method is given below. 
+A confidence interval with the "percentile" method is given below. The first interval is the confidence interval for the results when using my manual bootstrap above, and the second interval is the confidence interval calculated with the bootstrap from the library above. 
 
 ```{r}
 # Ratio in sample.
 sample.ratio <- mean(only.Math)/mean(only.Social) 
-(ciPercentile <- quantile(b.ratio.means, c(0.025, 0.975))) #Quantile.
-quantile(b$t[,1], c(0.025, 0.975))
+(ciPercentile <- quantile(b.ratio.means, c(0.025, 0.975))) # Quantile with manual bootstrap. 
+quantile(b$t[,1], c(0.025, 0.975)) # Quantile with boot library. 
 
-c(2*sample.ratio - quantile(b.ratio.means, 0.975), 2*sample.ratio - quantile(b.ratio.means, 0.025)) # Basic!
-c(2*sample.ratio - quantile(b$t[,1], 0.975), 2*sample.ratio - quantile(b$t[,1], 0.025)) # Basic!
+c(2*sample.ratio - quantile(b.ratio.means, 0.975), 2*sample.ratio - quantile(b.ratio.means, 0.025)) # Basic with manual bootstrap. 
+c(2*sample.ratio - quantile(b$t[,1], 0.975), 2*sample.ratio - quantile(b$t[,1], 0.025)) # Basic with boot library.
 
-# Normal, for comparison. 
+# Normal, for comparison. None of them are the same as the one found with boot.ci below! Why?
 (ciNorm <- qnorm(p=c(.025, .975), mean=sample.ratio, sd=boot.ratio.sd))
-(ciNorm <- qnorm(p=c(.025, .975), mean=sample.ratio, sd=mean(sqrt(b$t[,2]))))
+(ciNorm <- qnorm(p=c(.025, .975), mean=sample.ratio, sd=sd(b$t[,1])))
 ```
 
 A confidence interval with the "studentized" method is given below. 
 
 ```{r}
-set.seed(1)
 z <- rep(NA, B)
-variances <- rep(NA, B)
+set.seed(1)
 for (i in 1:B){
   Math.resample <- sample(only.Math, replace = T)
   Social.resample <- sample(only.Social, replace = T) 
@@ -265,47 +293,117 @@ for (i in 1:B){
   mean.social <- mean(Social.resample)
   b.ratio.means[i] <- mean.math/mean.social  
   new.d <- cbind(c(Math.resample, Social.resample), c(rep(1,times=27), rep(2, times = 17)))
-  # se.resample <- rep(NA, N)
-  # for (j in 1:N){ # Could bootstrap the b.ratio.means here to calculate the sd perhaps? (replacing this loop)
-  #   se.resample[j] <- mean(sample(Math.resample, replace = T))/mean(sample(Social.resample, replace = T))
-  # }
+  # Manual bootstrap to estimate the standard error of each bootstrap estimate of the ratio. 
+  se.resample <- rep(NA, N)
+  for (j in 1:N){
+    se.resample[j] <- mean(sample(Math.resample, replace = T))/mean(sample(Social.resample, replace = T))
+  }
 
-  boot.se <- boot::boot(new.d, theta2, R = N, strata = new.d[,2])
-  #variances[i] <- var(se.resample) 
-  variances[i] <- var(boot.se$t) 
-  z[i] <- (b.ratio.means[i]-sample.ratio)/sd(boot.se$t)
-  #z[i] <- (b.ratio.means[i]-sample.ratio)/sd(se.resample)
+  # Bootstrap via library to estimate the standard error of each bootstrap estimate of the ratio. 
+  #boot.se <- boot::boot(new.book.data, theta2, R = 1000, strata = new.book.data[, 2])
+  #boot.se <- boot::boot(new.d, theta2, R = 1000, strata = new.d[, 2])
+  # Velg enten new.book.data eller new.d avhengig av hva som velges lenger oppe!
+  # Choice below depends on manual bootstrap or not. 
+  #z[i] <- (b.ratio.means[i]-sample.ratio)/sd(boot.se$t)
+  z[i] <- (b.ratio.means[i]-sample.ratio)/sd(se.resample)
+  
+  # z calculated by means of the estimated variances in the double-bootstrap from earlier. 
+  #z[i] <- (b.ratio.means[i]-sample.ratio)/sqrt(b$t[,2][i])
 }
-(mean(b.ratio.means))
-(sd(b.ratio.means))
+
 (ciStudentized <- c(sample.ratio - quantile(z, 0.975)*boot.ratio.sd, sample.ratio - quantile(z, 0.025)*boot.ratio.sd))
-boot.ci(b) 
-mean(variances)
+(sample.ratio + boot.ratio.sd*quantile(-z, c(0.025, 0.975))) # The same. 
+boot.ci(b) # This is more similar to the one found via this library. 
+# Thus, something wrong in the way the sd is estimated for each bootstrap estimate inside the loop!
 ```
 
 The results when using the bootstrap package compared to coding the studentized confidence interval manually are quite different. **Surely I am misunderstanding the formula for calculating the studentized CI. Have I used the "correct parts" in the formula above?**
 
 ### e) 
 
-A permutation test to compare the two bootstrap means is built in this problem. It is applied to the data and the result is compared with an alternative based on a non-parametric test.
+A permutation test to compare the two bootstrap means is built in this problem. It is applied to the data and the result is compared with an alternative based on a non-parametric test. First, the difference of bootstrap means is found, which is shown below. 
 
 ```{r}
 (diff.boot.means <- boot.mean.Math - boot.mean.Social) # First find the difference of means. 
+```
+
+Then, the constructed permutation test is applied to the data. 
+
+```{r}
 perms <- 10000
-diffs <- rep(1, perms)
+diffs <- rep(NA, perms)
 set.seed(1)
 for (i in 1:perms){
   s <- sample(books[, "Price"]) # Sample from the combined population.
-  diffs[i] <- mean(s[1:27]) - mean(s[28:44]) # Keep 27 in Math and 17 in Social. .
+  diffs[i] <- mean(s[1:27]) - mean(s[28:44]) # Keep 27 in Math and 17 in Social. 
 }
+```
 
+The histogram shows the distribution of the different permutation resamples. Moreover, the positive difference of means and the negative difference of means are plotted in dashed red lines. 
+
+```{r}
 # The null hypothesis looks to not hold that well.
-hist(diffs, breaks = 100)
-abline(v=diff.boot.means, col = "red", lty = 2)
+hist(diffs, breaks = 100, main = "Differences of means under null hypothesis (permutations)",
+     xlab = "Differences")
+abline(v=c(-diff.boot.means, diff.boot.means), col = "red", lty = 2)
+```
 
+The $p$-value is found by counting the amount of differences in means found under the null hypothesis, via permutation, that are larger than the positive difference of means or smaller than the negative difference of means. We are using a two-sided test since we want to test the difference between the means in both directions, even though we suspect that the mean in Math \& Science is larger than the mean in Social Sciences. 
+
+```{r}
 # Calculate the p-value. Evidence against null hypothesis I would say, which means that the ratios are different. 
 (p_value <- (sum(diffs >= diff.boot.means) + sum(diffs <= -diff.boot.means))/perms)
+```
 
+As can be seen from the $p$-value above, it is statistically significant to any reasonable level, which means that the null hypothesis can be rejected. We conclude that there exists a difference in the means, based on the two-sided test. What conclusion would a one-sided test yield? Below we calculate the $p$-value only by counting the amount of differences in means under the null hypothesis larger than the positive difference of means from above. 
+
+```{r}
+sum(diffs >= diff.boot.means)/perms
+```
+
+Again, this value gives rejection of the null hypothesis to a reasonable significance level. Counting the amount of differences in means under the null hypothesis smaller than the negative difference of means from above, as done below, yields the same conclusion. 
+
+```{r}
+sum(diffs <= -diff.boot.means)/perms
+```
+
+Thus, the permutation test yields the conclusion that the are different. 
+
+**Hvorfor er verdien over enda mindre? I.e. enda mer signifikant! Tenke på null-hypotesene i hvert tilfelle!! Hva betyr det egentlig for konklusjonen av en én-sidig test? Kanskje bare ha med den to-sidige? **
+
+Next, we should compare this result to alternative based on a non-parametric test. First, a test based on the bootstrap is considered. This is very similar to the permutation test, except that the sampling is with replacement, instead of without replacement. The counted $p$-value is shown below.  
+
+```{r}
+B <- 10000
+diffs <- rep(NA, B)
+set.seed(1)
+for (i in 1:B){
+  s <- sample(books[, "Price"], replace = T) # Sample from the combined population.
+  diffs[i] <- mean(s[1:27]) - mean(s[28:44]) # Keep 27 in Math and 17 in Social. 
+}
+
+((sum(diffs >= diff.boot.means) + sum(diffs <= -diff.boot.means))/B)
+```
+
+This gives the same conclusion, that the means are statistically different. 
+
+```{r}
+# One sided bootstrap. 
+(1+sum(diffs >= diff.boot.means))/(B+1)
+
+# One sided bootstrap.
+(1+sum(diffs <= -diff.boot.means))/(B+1)
+ 
+# Two sided bootstrap. 2*min(p1, p2) (above)
+2*(1+sum(diffs <= -diff.boot.means))/(B+1)
+
+# Can use a pivotal quantity also (as in studentized CI).
+#z0 <- (sample.ratio-) # What is \theta_0 on page 23 ?
+```
+
+Below, some libraries have been used to show that the conclusion stays the same with different types of non-parametric tests. 
+
+```{r}
 # Computed with a library, not sure how it finds Z.
 set.seed(1)
 p1 <- permTS(b.means.Math, b.means.Social)
@@ -316,8 +414,9 @@ t <- wilcox.test(b.means.Math, b.means.Social)
 t # This gives the same conclusion at least. 
 ```
 
-** Som alternativ tests: Kan bruke Wilcox (? (fra stat4BusMan?) Eller en test basert på bootstrap? **
+
+**Som alternativ tests: Kan bruke Wilcox (? (fra stat4BusMan?) Eller en test basert på bootstrap? (bootstrap test!)**
 
 ### f) 
 
-Are the answers to the previous questions consistent? The tests done in e) indicate that the means of the two areas are statistically different. The estimate of the bootstrap ratio of the means also indicates the same, since the ratio is estimated to `r boot.ratio.mean` and the standard error of this estimate is estimated to `r boot.ratio.sd`. However, some of the confidence intervals built from the bootstrap estimates give rise to the opposite conclusion; that the means are not statistically different. This is seen from the Studentized confidence interval for instance, which contains the value 1 inside the interval, which means that we cannot be confident that the ratio is different from 1. Thus, I would conclude that all answers in this problem are not consistent. **Given that I have calculated the studentized confidence interval correctly!**
+Are the answers to the previous questions consistent? The tests done in e) indicate that the means of the two areas are statistically different. The estimate of the bootstrap ratio of the means also indicates the same, since the ratio is estimated to `r boot.ratio.mean` and the standard error of this estimate is estimated to `r boot.ratio.sd`. However, some of the confidence intervals built from the bootstrap estimates give rise to the opposite conclusion; that the means are not statistically different. This is seen from the Studentized confidence interval for instance, which contains the value 1 inside the interval, which means that we cannot be confident that the ratio is different from 1. Thus, I would conclude that all answers in this problem are not consistent. **This conclusion depends on which of the two studentized confidence intervals I have as alternatives now (se bilder på tlf)!**
