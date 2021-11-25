@@ -140,6 +140,8 @@ only.Social <- books[books$Area == "Social Sciences", "Price"] # Only Social boo
 s.soc <- summary(only.Social)
 hist(only.Social, breaks = 20, xlab = "Social Sciences Books", main = "Histogram of Social Sciences Books")
 
+boxplot(Price ~ Area, data = books)
+
 df <- cbind(s.math, s.soc)
 colnames(df) <- c("Math & Science", "Social Sciences") 
 df <- rbind(df, "Std. Err." = c(sd(only.Math), sd(only.Social)), "Sum" = c(sum(only.Math), sum(only.Social)), 
@@ -147,7 +149,7 @@ df <- rbind(df, "Std. Err." = c(sd(only.Math), sd(only.Social)), "Sum" = c(sum(o
 df
 ```
 
-At first glance at the summary above, the price in the two areas look quite different. This might suggest that there is a difference in prices in general between the two areas. All the quantiles are lower in the Social Sciences compared to Math \& Science, which might suggest that prices on many books are lower in the former area compared to the latter area. Note that there are a different amount of books from each area in the data set and that the total sum of prices is different. 
+At first glance at the summary above, the price in the two areas look quite different. This might suggest that there is a difference in prices in general between the two areas. All the quantiles are lower in the Social Sciences compared to the respective quantiles in Math \& Science, which might suggest that prices on many books are lower in the former area compared to the latter area. Note that there are a different amount of books from each area in the data set and that the total sum of prices is different. 
 
 ### b) 
 
