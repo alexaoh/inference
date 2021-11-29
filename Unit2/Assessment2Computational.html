@@ -179,7 +179,7 @@ pre code {
 <h1 class="title toc-ignore">Computational Part of Assessment Exercises</h1>
 <h3 class="subtitle">Advanced Statistical Inference - Unit 2</h3>
 <h4 class="author">Alexander J Ohrt</h4>
-<h4 class="date">25 november, 2021</h4>
+<h4 class="date">29 november, 2021</h4>
 
 </div>
 
@@ -210,7 +210,7 @@ pre code {
 \end{equation}\]</span></p>
 <div id="a" class="section level3">
 <h3>a)</h3>
-<p>A plot of the empirical cdf overimposed on the theoretical distribution function is shown below. The empirical cdf is plotted together with four differentWeibull distribution functions. In all four cases, the shape parameter is fixed at 2. The scale parameters used in each case are the maximum likelihood estimator (MLE) for <span class="math inline">\(\theta\)</span>, the method of moments estimator (MME) for <span class="math inline">\(\theta\)</span>, a scale parameter found by a ‘maximum goodness-of-fit estimation’ and a scale parameter found by maximum likelihood estimation, both the latter scale parameters found with the function <code>fitdist</code>. Note that the MLE and the MME are calculated analytically in the latter parts of this exercise.</p>
+<p>A plot of the empirical cdf overimposed on the theoretical distribution function is shown below. The empirical cdf is plotted together with four different Weibull distribution functions. In all four cases, the shape parameter is fixed at 2. The scale parameters used in each case are the maximum likelihood estimator (MLE) for <span class="math inline">\(\theta\)</span>, the method of moments estimator (MME) for <span class="math inline">\(\theta\)</span>, a scale parameter found by a ‘maximum goodness-of-fit estimation’ and a scale parameter found by maximum likelihood estimation, both the latter scale parameters found with the function <code>fitdist</code>. Note that the MLE and the MME are calculated analytically in the latter parts of this exercise.</p>
 <pre class="r"><code>data &lt;- read.csv(&quot;Service.csv&quot;) 
 str(data)
 head(data)
@@ -608,15 +608,8 @@ abline(v=c(-diff.boot.means, diff.boot.means), col = &quot;red&quot;, lty = 2)</
 <pre class="r"><code># Calculate the p-value. Evidence against null hypothesis I would say, which means that the ratios are different. 
 (p_value &lt;- (sum(diffs &gt;= diff.boot.means) + sum(diffs &lt;= -diff.boot.means))/perms)</code></pre>
 <pre><code>## [1] 0.0016</code></pre>
-<p>As can be seen from the <span class="math inline">\(p\)</span>-value above, it is statistically significant to any reasonable level, which means that the null hypothesis can be rejected. We conclude that there exists a difference in the means, based on the two-sided test. What conclusion would a one-sided test yield? Below we calculate the <span class="math inline">\(p\)</span>-value only by counting the amount of differences in means under the null hypothesis larger than the positive difference of means from above.</p>
-<pre class="r"><code>sum(diffs &gt;= diff.boot.means)/perms</code></pre>
-<pre><code>## [1] 0.001</code></pre>
-<p>Again, this value gives rejection of the null hypothesis to a reasonable significance level. Counting the amount of differences in means under the null hypothesis smaller than the negative difference of means from above, as done below, yields the same conclusion.</p>
-<pre class="r"><code>sum(diffs &lt;= -diff.boot.means)/perms</code></pre>
-<pre><code>## [1] 6e-04</code></pre>
-<p>Thus, the permutation test yields the conclusion that the are different.</p>
-<p><strong>Hvorfor er verdien over enda mindre? I.e. enda mer signifikant! Tenke på null-hypotesene i hvert tilfelle!! Hva betyr det egentlig for konklusjonen av en én-sidig test? Kanskje bare ha med den to-sidige? </strong></p>
-<p>Next, we should compare this result to alternative based on a non-parametric test. First, a test based on the bootstrap is considered. This is very similar to the permutation test, except that the sampling is with replacement, instead of without replacement. The counted <span class="math inline">\(p\)</span>-value is shown below.</p>
+<p>As can be seen from the <span class="math inline">\(p\)</span>-value above, it is statistically significant to any reasonable level, which means that the null hypothesis can be rejected. We conclude that there exists a difference in the means, based on the two-sided test.</p>
+<p>Next, we should compare this result to an alternative based on a non-parametric test. A test based on the bootstrap is considered. This is very similar to the permutation test, except that the sampling is with replacement, instead of without replacement. The counted <span class="math inline">\(p\)</span>-value is shown below.</p>
 <pre class="r"><code>B &lt;- 10000
 diffs &lt;- rep(NA, B)
 set.seed(1)
@@ -628,21 +621,10 @@ for (i in 1:B){
 ((sum(diffs &gt;= diff.boot.means) + sum(diffs &lt;= -diff.boot.means))/B)</code></pre>
 <pre><code>## [1] 0.0015</code></pre>
 <p>This gives the same conclusion, that the means are statistically different.</p>
-<pre class="r"><code># One sided bootstrap. 
-(1+sum(diffs &gt;= diff.boot.means))/(B+1)</code></pre>
-<pre><code>## [1] 0.0009999</code></pre>
-<pre class="r"><code># One sided bootstrap.
-(1+sum(diffs &lt;= -diff.boot.means))/(B+1)</code></pre>
-<pre><code>## [1] 0.00069993</code></pre>
-<pre class="r"><code># Two sided bootstrap. 2*min(p1, p2) (above)
-2*(1+sum(diffs &lt;= -diff.boot.means))/(B+1)</code></pre>
-<pre><code>## [1] 0.00139986</code></pre>
-<pre class="r"><code># Can use a pivotal quantity also (as in studentized CI). How is this done!?
-#z0 &lt;- (sample.ratio-) # What is \theta_0 on page 23 ?</code></pre>
 </div>
 <div id="f" class="section level3">
 <h3>f)</h3>
-<p>Are the answers to the previous questions consistent? The tests done in e) indicate that the means of the two areas are statistically different. The estimate of the bootstrap ratio of the means also indicates the same, since the ratio is estimated to 1.6314933 and the standard error of this estimate is estimated to 0.3216363. Additionally, the confidence intervals built from the bootstrap estimates give rise to the same conclusion. This is seen from the confidence intervals, since they do not contain the value 1 (with 95% confidence), which means that the ratio of means is statistically different from 1. Thus, I would conclude that all answers in this problem are consistent; that the mean price in Math % Science is larger than the mean price in Social Sciences.</p>
+<p>Are the answers to the previous questions consistent? The tests done in e) indicate that the means of the two areas are statistically different. The estimate of the bootstrap ratio of the means also indicates the same, since the ratio is estimated to 1.6314933 and the standard error of this estimate is estimated to 0.3216363. Additionally, the confidence intervals built from the bootstrap estimates give rise to the same conclusion. This is seen from the confidence intervals, since they do not contain the value 1 (with 95% confidence), which means that the ratio of means is statistically different from 1. Thus, I would conclude that all answers in this problem are consistent; that the mean price in Math &amp; Science is larger than the mean price in Social Sciences.</p>
 </div>
 </div>
 

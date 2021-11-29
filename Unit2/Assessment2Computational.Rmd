@@ -38,7 +38,7 @@ Modelling service times is one area of research in queuing theory. We are given 
 
 ### a) 
 
-A plot of the empirical cdf overimposed on the theoretical distribution function is shown below. The empirical cdf is plotted together with four differentWeibull distribution functions. In all four cases, the shape parameter is fixed at 2. The scale parameters used in each case are the maximum likelihood estimator (MLE) for $\theta$, the method of moments estimator (MME) for $\theta$, a scale parameter found by a 'maximum goodness-of-fit estimation' and a scale parameter found by maximum likelihood estimation, both the latter scale parameters found with the function `fitdist`. Note that the MLE and the MME are calculated analytically in the latter parts of this exercise.
+A plot of the empirical cdf overimposed on the theoretical distribution function is shown below. The empirical cdf is plotted together with four different Weibull distribution functions. In all four cases, the shape parameter is fixed at 2. The scale parameters used in each case are the maximum likelihood estimator (MLE) for $\theta$, the method of moments estimator (MME) for $\theta$, a scale parameter found by a 'maximum goodness-of-fit estimation' and a scale parameter found by maximum likelihood estimation, both the latter scale parameters found with the function `fitdist`. Note that the MLE and the MME are calculated analytically in the latter parts of this exercise.
 
 ```{r, results = "hide"}
 data <- read.csv("Service.csv") 
@@ -365,23 +365,9 @@ The $p$-value is found by counting the amount of differences in means found unde
 (p_value <- (sum(diffs >= diff.boot.means) + sum(diffs <= -diff.boot.means))/perms)
 ```
 
-As can be seen from the $p$-value above, it is statistically significant to any reasonable level, which means that the null hypothesis can be rejected. We conclude that there exists a difference in the means, based on the two-sided test. What conclusion would a one-sided test yield? Below we calculate the $p$-value only by counting the amount of differences in means under the null hypothesis larger than the positive difference of means from above. 
+As can be seen from the $p$-value above, it is statistically significant to any reasonable level, which means that the null hypothesis can be rejected. We conclude that there exists a difference in the means, based on the two-sided test. 
 
-```{r}
-sum(diffs >= diff.boot.means)/perms
-```
-
-Again, this value gives rejection of the null hypothesis to a reasonable significance level. Counting the amount of differences in means under the null hypothesis smaller than the negative difference of means from above, as done below, yields the same conclusion. 
-
-```{r}
-sum(diffs <= -diff.boot.means)/perms
-```
-
-Thus, the permutation test yields the conclusion that the are different. 
-
-**Hvorfor er verdien over enda mindre? I.e. enda mer signifikant! Tenke på null-hypotesene i hvert tilfelle!! Hva betyr det egentlig for konklusjonen av en én-sidig test? Kanskje bare ha med den to-sidige? **
-
-Next, we should compare this result to alternative based on a non-parametric test. First, a test based on the bootstrap is considered. This is very similar to the permutation test, except that the sampling is with replacement, instead of without replacement. The counted $p$-value is shown below.  
+Next, we should compare this result to an alternative based on a non-parametric test. A test based on the bootstrap is considered. This is very similar to the permutation test, except that the sampling is with replacement, instead of without replacement. The counted $p$-value is shown below.  
 
 ```{r}
 B <- 10000
@@ -397,20 +383,6 @@ for (i in 1:B){
 
 This gives the same conclusion, that the means are statistically different. 
 
-```{r}
-# One sided bootstrap. 
-(1+sum(diffs >= diff.boot.means))/(B+1)
-
-# One sided bootstrap.
-(1+sum(diffs <= -diff.boot.means))/(B+1)
- 
-# Two sided bootstrap. 2*min(p1, p2) (above)
-2*(1+sum(diffs <= -diff.boot.means))/(B+1)
-
-# Can use a pivotal quantity also (as in studentized CI). How is this done!?
-#z0 <- (sample.ratio-) # What is \theta_0 on page 23 ?
-```
-
 ### f) 
 
-Are the answers to the previous questions consistent? The tests done in e) indicate that the means of the two areas are statistically different. The estimate of the bootstrap ratio of the means also indicates the same, since the ratio is estimated to `r boot.ratio.mean` and the standard error of this estimate is estimated to `r boot.ratio.sd`. Additionally, the confidence intervals built from the bootstrap estimates give rise to the same conclusion. This is seen from the confidence intervals, since they do not contain the value 1 (with 95\% confidence), which means that the ratio of means is statistically different from 1. Thus, I would conclude that all answers in this problem are consistent; that the mean price in Math \% Science is larger than the mean price in Social Sciences. 
+Are the answers to the previous questions consistent? The tests done in e) indicate that the means of the two areas are statistically different. The estimate of the bootstrap ratio of the means also indicates the same, since the ratio is estimated to `r boot.ratio.mean` and the standard error of this estimate is estimated to `r boot.ratio.sd`. Additionally, the confidence intervals built from the bootstrap estimates give rise to the same conclusion. This is seen from the confidence intervals, since they do not contain the value 1 (with 95\% confidence), which means that the ratio of means is statistically different from 1. Thus, I would conclude that all answers in this problem are consistent; that the mean price in Math \& Science is larger than the mean price in Social Sciences. 
