@@ -185,46 +185,132 @@ pre code {
 
 <div id="TOC">
 <ul>
+<li><a href="#problem-2">Problem 2</a>
+<ul>
+<li><a href="#section">2.4</a></li>
+</ul></li>
 <li><a href="#problem-3">Problem 3</a>
 <ul>
-<li><a href="#section">3.4</a></li>
-<li><a href="#section-1">3.5</a></li>
+<li><a href="#section-1">3.4</a></li>
+<li><a href="#section-2">3.5</a></li>
 </ul></li>
 <li><a href="#problem-4">Problem 4</a></li>
 </ul>
 </div>
 
+<div id="problem-2" class="section level2">
+<h2>Problem 2</h2>
+<div id="section" class="section level3">
+<h3>2.4</h3>
+<p>Contour plot of the relative log-likelihood <span class="math inline">\(\tilde{l}(\lambda, \theta)\)</span>.</p>
+<pre class="r"><code># Using the contour function. </code></pre>
+</div>
+</div>
 <div id="problem-3" class="section level2">
 <h2>Problem 3</h2>
-<div id="section" class="section level3">
+<div id="section-1" class="section level3">
 <h3>3.4</h3>
 <p>The Newton-Raphson algorithm is implemented using the expressions obtained analytically. The function is given in the cell below.</p>
-<pre class="r"><code>newton.raphson &lt;- function(sample, eps){
+<pre class="r"><code>newton.raphson &lt;- function(sample, it0, eps, maxiter){
   n &lt;- length(sample)
   d1 &lt;- function(iterate){
-    return(n/iterate - sum(log(sample)*(1-sample^iterate)))
-  }
-  d2 &lt;- function(iterate){
-    return(-n/iterate^2 - sum(sample^iterate*(log(sample))^2 + sample^(iterate-1)))
+    return(n/iterate + sum(log(sample)*(1-sample^iterate)))
   }
   
-  # Some random initial values to get the loop started. 
-  it1 &lt;- 1
-  it0 &lt;- 1+10*eps
-  while (abs(it1 - it0) &gt; eps){
-    it1 &lt;- it0 - d1(it0)/d2(it0)
-    # Need to do something to it0 also, so the loop stops!
+  d2 &lt;- function(iterate){
+    return(-n/iterate^2 - sum(sample^iterate*(log(sample))^2))
   }
+  
+  errest &lt;- 2*eps
+  i &lt;- 0
+  while (errest &gt; eps &amp;&amp; i &lt; maxiter){
+    it1 &lt;- it0 - d1(it0)/d2(it0)
+    errest &lt;- abs(it1 - it0)
+    it0 &lt;- it1
+    i &lt;- i + 1
+  }
+  
+  return(cbind(&quot;Fixed Point&quot; = it1, &quot;Iterations&quot; = i, &quot;d2(fixed point)&quot; = d2(it1)))
 }</code></pre>
-<p>THE FUNCTION CAN BE CHECKED WITH A PACKAGE AFTER IMPLEMENTING, TO SEE IF IT IS CORRECT!</p>
 </div>
-<div id="section-1" class="section level3">
+<div id="section-2" class="section level3">
 <h3>3.5</h3>
-<p>Generate samples of size n = 5 from a Weibull distribution with parameters <span class="math inline">\(\alpha = 1\)</span>, <span class="math inline">\(\alpha = 2\)</span> and <span class="math inline">\(\alpha = 5\)</span> respectively. Apply the preceeding algorithm to obtain a numerical approximation to the value of <span class="math inline">\(\alpha\)</span> in each case. Comment on the difference between the results of each case.</p>
-<pre class="r"><code>alpha_1 &lt;- rweibull(n = 5, scale = 1, shape = 1)
-alpha_2 &lt;- rweibull(n = 5, scale = 1, shape = 2)
-alpha_5 &lt;- rweibull(n = 5, scale = 1, shape = 5)</code></pre>
-<p>The numerical approximation in each of the cases is given below.</p>
+<p>Generate samples of size n = 5 from a Weibull distribution with parameters <span class="math inline">\(\alpha = 1\)</span>, <span class="math inline">\(\alpha = 2\)</span> and <span class="math inline">\(\alpha = 5\)</span> respectively. Apply the preceding algorithm to obtain a numerical approximation to the value of <span class="math inline">\(\alpha\)</span> in each case. Comment on the difference between the results of each case.</p>
+<pre class="r"><code>set.seed(1)
+n &lt;- 5
+alpha_1 &lt;- rweibull(n = n, scale = 1, shape = 1)
+alpha_2 &lt;- rweibull(n = n, scale = 1, shape = 2)
+alpha_5 &lt;- rweibull(n = n, scale = 1, shape = 5)</code></pre>
+<p>The numerical approximation in each of the cases is given below. First, the numerical approximation to <span class="math inline">\(\alpha = 1\)</span> when generating <span class="math inline">\(n = 5\)</span> samples is</p>
+<pre class="r"><code>eps &lt;- 0.0000000000001
+par &lt;- 0.5
+newton.raphson(alpha_1, par, eps, 100)</code></pre>
+<pre><code>##      Fixed Point Iterations d2(fixed point)
+## [1,]    1.529233          7       -3.008588</code></pre>
+<p>Next, the numerical approximation to <span class="math inline">\(\alpha = 2\)</span> when generating <span class="math inline">\(n = 5\)</span> samples is</p>
+<pre class="r"><code>newton.raphson(alpha_2, par, eps, 100)</code></pre>
+<pre><code>##      Fixed Point Iterations d2(fixed point)
+## [1,]    1.555624          7       -3.266961</code></pre>
+<p>Finally, the numerical approximation to <span class="math inline">\(\alpha = 5\)</span> when generating <span class="math inline">\(n = 5\)</span> samples is</p>
+<pre class="r"><code>newton.raphson(alpha_5, par, eps, 100)</code></pre>
+<pre><code>##      Fixed Point Iterations d2(fixed point)
+## [1,]    7.847314         10      -0.1442047</code></pre>
+<p>It is apparent that none of the results are very similar to the true values of <span class="math inline">\(\alpha\)</span>. This is largely because we only have <span class="math inline">\(n = 5\)</span> samples in each case. If the sample size is increased, the fixed points come much closer to the true values.</p>
+<p>OTHER COMMENTS?!</p>
+<p>For completeness we check the results using the <code>optim</code> function. The first results is</p>
+<pre class="r"><code>loglik &lt;- function(alpha, data){
+  n &lt;- length(data)
+  (n*log(alpha) - sum(data^alpha) + (alpha-1)*sum(log(data)))
+}
+
+gr &lt;- function(alpha, data){
+  n &lt;- length(data)
+  return(n/alpha + sum(log(data)*(1-data^alpha)))
+}
+
+# optim(par = 0.5, fn = loglik, data = alpha_1, 
+#       hessian = T, method = &quot;L-BFGS-B&quot;, lower = eps, 
+#       upper = 1-eps, control = list(fnscale = -1))
+
+res1 &lt;- optim(par = par, fn = loglik, data = alpha_1, 
+      hessian = T, control = list(fnscale = -1))
+(cbind(&quot;Fixed Point&quot; = res1$par, &quot;Iterations&quot; = res1$counts[[1]], &quot;Hessian&quot; = res1$hessian[[1]], &quot;Convergence&quot; = res1$convergence))</code></pre>
+<pre><code>##      Fixed Point Iterations   Hessian Convergence
+## [1,]    1.529297         32 -3.008399           0</code></pre>
+<pre class="r"><code>res1 &lt;- optim(par = par, fn = loglik, gr = gr, data = alpha_1, hessian = T, control = list(fnscale = -1))
+(cbind(&quot;Fixed Point&quot; = res1$par, &quot;Iterations&quot; = res1$counts[[1]], &quot;Hessian&quot; = res1$hessian[[1]], &quot;Convergence&quot; = res1$convergence))</code></pre>
+<pre><code>##      Fixed Point Iterations   Hessian Convergence
+## [1,]    1.529297         32 -3.008398           0</code></pre>
+<pre class="r"><code># The below gives the same result. 
+optimize(loglik, data = alpha_1, interval = c(0,10), maximum = T)</code></pre>
+<pre><code>## $maximum
+## [1] 1.529229
+## 
+## $objective
+## [1] -4.044945</code></pre>
+<p>The second result is</p>
+<pre class="r"><code>res2 &lt;- optim(par = par, fn = loglik, data = alpha_2, 
+      hessian = T, control = list(fnscale = -1))
+(cbind(&quot;Fixed Point&quot; = res2$par, &quot;Iterations&quot; = res2$counts[[1]], &quot;Hessian&quot; = res2$hessian[[1]], &quot;Convergence&quot; = res2$convergence))</code></pre>
+<pre><code>##      Fixed Point Iterations   Hessian Convergence
+## [1,]    1.555469         30 -3.267429           0</code></pre>
+<pre class="r"><code>res2 &lt;- optim(par = par, fn = loglik, gr = gr, data = alpha_2, 
+      hessian = T, control = list(fnscale = -1))
+(cbind(&quot;Fixed Point&quot; = res2$par, &quot;Iterations&quot; = res2$counts[[1]], &quot;Hessian&quot; = res2$hessian[[1]], &quot;Convergence&quot; = res2$convergence))</code></pre>
+<pre><code>##      Fixed Point Iterations   Hessian Convergence
+## [1,]    1.555469         30 -3.267428           0</code></pre>
+<p>The third result is</p>
+<pre class="r"><code>res3 &lt;- optim(par = par, fn = loglik, data = alpha_5, 
+      hessian = T, control = list(fnscale = -1))
+(cbind(&quot;Fixed Point&quot; = res3$par, &quot;Iterations&quot; = res3$counts[[1]], &quot;Hessian&quot; = res3$hessian[[1]], &quot;Convergence&quot; = res3$convergence))</code></pre>
+<pre><code>##      Fixed Point Iterations    Hessian Convergence
+## [1,]    7.846875         36 -0.1442135           0</code></pre>
+<pre class="r"><code>res3 &lt;- optim(par = par, fn = loglik, gr = gr, data = alpha_5, 
+      hessian = T, control = list(fnscale = -1))
+(cbind(&quot;Fixed Point&quot; = res3$par, &quot;Iterations&quot; = res3$counts[[1]], &quot;Hessian&quot; = res3$hessian[[1]], &quot;Convergence&quot; = res3$convergence))</code></pre>
+<pre><code>##      Fixed Point Iterations    Hessian Convergence
+## [1,]    7.846875         36 -0.1442135           0</code></pre>
+<p>As is apparent, the <code>optim</code> function (using the Nelder-Mead method for maximization) gives a very similar results to our implementation.</p>
 </div>
 </div>
 <div id="problem-4" class="section level2">

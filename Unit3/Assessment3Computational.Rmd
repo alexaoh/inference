@@ -16,10 +16,21 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = F)
 setwd("/home/ajo/gitRepos/inference/Unit2")
 library(dplyr)
 ```
+
+## Problem 2
+
+### 2.4
+
+Contour plot of the relative log-likelihood $\tilde{l}(\lambda, \theta)$.
+
+```{r}
+# Using the contour function. 
+```
+
 
 ## Problem 3
 
@@ -28,44 +39,118 @@ library(dplyr)
 The Newton-Raphson algorithm is implemented using the expressions obtained analytically. The function is given in the cell below. 
 
 ```{r}
-newton.raphson <- function(sample, eps){
+newton.raphson <- function(sample, it0, eps, maxiter){
   n <- length(sample)
   d1 <- function(iterate){
-    return(n/iterate - sum(log(sample)*(1-sample^iterate)))
-  }
-  d2 <- function(iterate){
-    return(-n/iterate^2 - sum(sample^iterate*(log(sample))^2 + sample^(iterate-1)))
+    return(n/iterate + sum(log(sample)*(1-sample^iterate)))
   }
   
-  # Some random initial values to get the loop started. 
-  it1 <- 1
-  it0 <- 1+10*eps
-  while (abs(it1 - it0) > eps){
-    it1 <- it0 - d1(it0)/d2(it0)
-    # Need to do something to it0 also, so the loop stops!
+  d2 <- function(iterate){
+    return(-n/iterate^2 - sum(sample^iterate*(log(sample))^2))
   }
+  
+  errest <- 2*eps
+  i <- 0
+  while (errest > eps && i < maxiter){
+    it1 <- it0 - d1(it0)/d2(it0)
+    errest <- abs(it1 - it0)
+    it0 <- it1
+    i <- i + 1
+  }
+  
+  return(cbind("Fixed Point" = it1, "Iterations" = i, "d2(fixed point)" = d2(it1)))
 }
 ```
 
-THE FUNCTION CAN BE CHECKED WITH A PACKAGE AFTER IMPLEMENTING, TO SEE IF IT IS CORRECT!
-
 ### 3.5 
 
-Generate samples of size n = 5 from a Weibull distribution with parameters $\alpha = 1$, $\alpha = 2$ and $\alpha = 5$ respectively. Apply the preceeding algorithm to obtain a numerical approximation to the value  of $\alpha$ in each case. Comment on the difference between the results of each case.
+Generate samples of size n = 5 from a Weibull distribution with parameters $\alpha = 1$, $\alpha = 2$ and $\alpha = 5$ respectively. Apply the preceding algorithm to obtain a numerical approximation to the value  of $\alpha$ in each case. Comment on the difference between the results of each case.
 
 ```{r}
-alpha_1 <- rweibull(n = 5, scale = 1, shape = 1)
-alpha_2 <- rweibull(n = 5, scale = 1, shape = 2)
-alpha_5 <- rweibull(n = 5, scale = 1, shape = 5)
+set.seed(1)
+n <- 5
+alpha_1 <- rweibull(n = n, scale = 1, shape = 1)
+alpha_2 <- rweibull(n = n, scale = 1, shape = 2)
+alpha_5 <- rweibull(n = n, scale = 1, shape = 5)
 ```
 
-The numerical approximation in each of the cases is given below. 
+The numerical approximation in each of the cases is given below. First, the numerical approximation to $\alpha = 1$ when generating $n = 5$ samples is
 
 ```{r}
-
+eps <- 0.0000000000001
+par <- 0.5
+newton.raphson(alpha_1, par, eps, 100)
 ```
 
+Next, the numerical approximation to $\alpha = 2$ when generating $n = 5$ samples is
 
+```{r}
+newton.raphson(alpha_2, par, eps, 100)
+```
+
+Finally, the numerical approximation to $\alpha = 5$ when generating $n = 5$ samples is
+
+```{r}
+newton.raphson(alpha_5, par, eps, 100)
+```
+
+It is apparent that none of the results are very similar to the true values of $\alpha$. This is largely because we only have $n = 5$ samples in each case. If the sample size is increased, the fixed points come much closer to the true values. 
+
+OTHER COMMENTS?!
+
+For completeness we check the results using the `optim` function. The first results is 
+
+```{r}
+loglik <- function(alpha, data){
+  n <- length(data)
+  (n*log(alpha) - sum(data^alpha) + (alpha-1)*sum(log(data)))
+}
+
+gr <- function(alpha, data){
+  n <- length(data)
+  return(n/alpha + sum(log(data)*(1-data^alpha)))
+}
+
+# optim(par = 0.5, fn = loglik, data = alpha_1, 
+#       hessian = T, method = "L-BFGS-B", lower = eps, 
+#       upper = 1-eps, control = list(fnscale = -1))
+
+res1 <- optim(par = par, fn = loglik, data = alpha_1, 
+      hessian = T, control = list(fnscale = -1))
+(cbind("Fixed Point" = res1$par, "Iterations" = res1$counts[[1]], "Hessian" = res1$hessian[[1]], "Convergence" = res1$convergence))
+
+res1 <- optim(par = par, fn = loglik, gr = gr, data = alpha_1, hessian = T, control = list(fnscale = -1))
+(cbind("Fixed Point" = res1$par, "Iterations" = res1$counts[[1]], "Hessian" = res1$hessian[[1]], "Convergence" = res1$convergence))
+
+# The below gives the same result. 
+optimize(loglik, data = alpha_1, interval = c(0,10), maximum = T)
+```
+
+The second result is 
+
+```{r}
+res2 <- optim(par = par, fn = loglik, data = alpha_2, 
+      hessian = T, control = list(fnscale = -1))
+(cbind("Fixed Point" = res2$par, "Iterations" = res2$counts[[1]], "Hessian" = res2$hessian[[1]], "Convergence" = res2$convergence))
+
+res2 <- optim(par = par, fn = loglik, gr = gr, data = alpha_2, 
+      hessian = T, control = list(fnscale = -1))
+(cbind("Fixed Point" = res2$par, "Iterations" = res2$counts[[1]], "Hessian" = res2$hessian[[1]], "Convergence" = res2$convergence))
+```
+
+The third result is 
+
+```{r}
+res3 <- optim(par = par, fn = loglik, data = alpha_5, 
+      hessian = T, control = list(fnscale = -1))
+(cbind("Fixed Point" = res3$par, "Iterations" = res3$counts[[1]], "Hessian" = res3$hessian[[1]], "Convergence" = res3$convergence))
+
+res3 <- optim(par = par, fn = loglik, gr = gr, data = alpha_5, 
+      hessian = T, control = list(fnscale = -1))
+(cbind("Fixed Point" = res3$par, "Iterations" = res3$counts[[1]], "Hessian" = res3$hessian[[1]], "Convergence" = res3$convergence))
+```
+
+As is apparent, the `optim` function (using the Nelder-Mead method for maximization) gives a very similar results to our implementation. 
 
 ## Problem 4
 
