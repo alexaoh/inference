@@ -1,0 +1,79 @@
+---
+title: "Computational Part of Assessment Exercises"
+subtitle: "Advanced Statistical Inference - Unit 3"
+author: "Alexander J Ohrt"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_depth: 3
+    theme: readable
+    highlight: textmate
+    number_sections: false
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("/home/ajo/gitRepos/inference/Unit2")
+library(dplyr)
+```
+
+## Problem 3
+
+### 3.4
+
+The Newton-Raphson algorithm is implemented using the expressions obtained analytically. The function is given in the cell below. 
+
+```{r}
+newton.raphson <- function(sample, eps){
+  n <- length(sample)
+  d1 <- function(iterate){
+    return(n/iterate - sum(log(sample)*(1-sample^iterate)))
+  }
+  d2 <- function(iterate){
+    return(-n/iterate^2 - sum(sample^iterate*(log(sample))^2 + sample^(iterate-1)))
+  }
+  
+  # Some random initial values to get the loop started. 
+  it1 <- 1
+  it0 <- 1+10*eps
+  while (abs(it1 - it0) > eps){
+    it1 <- it0 - d1(it0)/d2(it0)
+    # Need to do something to it0 also, so the loop stops!
+  }
+}
+```
+
+THE FUNCTION CAN BE CHECKED WITH A PACKAGE AFTER IMPLEMENTING, TO SEE IF IT IS CORRECT!
+
+### 3.5 
+
+Generate samples of size n = 5 from a Weibull distribution with parameters $\alpha = 1$, $\alpha = 2$ and $\alpha = 5$ respectively. Apply the preceeding algorithm to obtain a numerical approximation to the value  of $\alpha$ in each case. Comment on the difference between the results of each case.
+
+```{r}
+alpha_1 <- rweibull(n = 5, scale = 1, shape = 1)
+alpha_2 <- rweibull(n = 5, scale = 1, shape = 2)
+alpha_5 <- rweibull(n = 5, scale = 1, shape = 5)
+```
+
+The numerical approximation in each of the cases is given below. 
+
+```{r}
+
+```
+
+
+
+## Problem 4
+
+Consider the 100 observations from a multinomial model with four cells governed by a parameter $p \in (0,.2)$
+
+| Cell        | 1         | 2         | 3          |
+|-------------|-----------|-----------|------------|
+| Probability | $p + 0.2$ | $p + 0.4$ | $0.4 - 2p$ |
+| Frequencies | 20        | 50        | 10         |
+
+Use the EM algorithm to approximate the MLE of $p$. Take $p_0 = 0.1$ as the initial value. 
