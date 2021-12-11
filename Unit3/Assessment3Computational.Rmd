@@ -154,7 +154,7 @@ As is apparent, the `optim` function (using the Nelder-Mead method for maximizat
 
 ## Problem 4
 
-Consider the 100 observations from a multinomial model with four cells governed by a parameter $p \in (0,.2)$
+Consider 80 observations from a multinomial model with three cells governed by a parameter $p \in (0,.2)$
 
 | Cell        | 1         | 2         | 3          |
 |-------------|-----------|-----------|------------|
@@ -162,3 +162,129 @@ Consider the 100 observations from a multinomial model with four cells governed 
 | Frequencies | 20        | 50        | 10         |
 
 Use the EM algorithm to approximate the MLE of $p$. Take $p_0 = 0.1$ as the initial value. 
+
+First of all I will calculate the explicit log-likelihood function for this problem and maximize it. After this, we will see that the EM algorithm approximates the result.  
+
+```{r}
+y1 <- 20
+y2 <- 50
+y3 <- 10
+```
+
+Since we know that this is a multinomial model, the joint density of the observations is 
+
+$$
+f(\mathbf{y}|p) = \frac{n!}{y_1!y_2!y_3!} (p+0.2)^{y_1}(p+0.4)^{y_2}(0.4-2p)^{y_3}.
+$$
+
+Thus, the log-likelihood function is 
+
+$$
+l(p|\mathbf{y}) = y_1\log(p+0.2) + y_2\log(p+0.4) + y_3\log(0.4-2p),
+$$
+
+when we ignore the values that do not depend on $p$. This can be maximized analytically, which requires some tedious computation. Instead, it is maximized numerically, via the `optimize` function. The result is 
+
+```{r}
+# Maximize the analytical function (numerically) to check results. 
+analytic.lik <- function(p){
+  return(y1*log(p+0.2) + y2*log(p+0.4)+y3*log(0.4-2*p))
+}
+ana <- optimize(analytic.lik, interval = c(0,0.2), maximum = T)
+ana$maximum
+```
+
+where the value of the objective function in the maximum is `r ana$objective`. As inspired by some [lecture notes](https://www.math.kth.se/matstat/gru/Statistical%20inference/Lecture8.pdf) from KTH on the EM algorithm, let us imagine that we have four cells instead of three by splitting the first cell into two. Thus, we have the table 
+
+| Cell        | 1.1       | 1.2       | 2          | 3          |
+|-------------|-----------|-----------|------------|------------|
+| Probability | $p$       | $0.2$     | $p + 0.4$  | $0.4 - 2p$ |
+| Frequencies | ?         | ?         | 50         | 10         |
+
+where we no longer know the exact frequency in cell 1.1 and 1.2. We only know that $y_{1.1} + y_{1.2} = y_1 = 20$. The joint density with this model in mind is 
+
+$$
+f_2(\mathbf{y}|p) = \frac{n!}{y_{1.1}!y_{1.2}!y_2!y_3!} p^{y_{1.1}}0.2^{y_{1.2}}(p+0.4)^{y_2}(0.4-2p)^{y_3}, 
+$$
+
+which gives the log-likelihood function
+
+$$
+l_2(p|\mathbf{y}) = y_{1.1}\log(p) + y_2\log(p+0.4) + y_3\log(0.4-2p).
+$$
+
+This cannot be maximized, since $y_{1.1}$ is a latent variable. This is where the EM algorithm comes into play. Set the initial guess $p^{(0)} = 0.1$. In the first $\textit{expectation}$-step (E-step) we calculate
+
+$$
+Q(p|p^{(0)}) = \text{E}_{p^{(0)}}[l_2(p|\mathbf{Y})|Y_1, Y_2, Y_3], 
+$$
+
+i.e. the expectation of the log-likelihood function given the observed variables, with respect to the initial guess for the parameter $p$. In the $\textit{maximization}$-step (M-step) the guess for $p$ will be updated by maximizing the expectation found in the E-step. Going back to the E-step, the value is calculated by noting that $Y_{1.1}|Y_1 \sim Bin(n = Y_1, p = \frac{p^{(0)}}{p^{(0)}+0.2})$ for the first step. Thus, we get 
+
+$$
+\begin{align}
+  Q(p|p^{(0)}) &= \text{E}_{p^{(0)}}[l_2(p|\mathbf{Y})|Y_1, Y_2, Y_3] \\
+               &= \text{E}_{p^{(0)}}[Y_{1.1}|Y_1]\log(p) + Y_2\log(p+0.4)+Y_3\log(0.4-2p) \\ 
+               &= \frac{Y_1p^{(0)}}{p^{(0)} + 0.2}\log(p) + Y_2\log(p+0.4)+Y_3\log(0.4-2p) \\
+               &= y_{1.1}^{(0)}\log(p) + Y_2\log(p+0.4)+Y_3\log(0.4-2p),
+\end{align}
+$$
+
+where we have defined $y_{1.1}^{(0)} := \frac{Y_1p^{(0)}}{p^{(0)} + 0.2}$. As already noted, the expectation $Q(p|p^{(0)})$ is maximized with respect to $p$ in the M-step, in order to find the new guess for $p$, $p^{(1)}$. The final iteration takes the form 
+
+$$
+\begin{align}
+y_{1.1}^{(i)} &= \frac{Y_1p^{(i)}}{p^{(i)} + 0.2},\\
+p^{(i+1)} &= \max_{p}Q(p|p^{(i)}) = \max_{p} y_{1.1}^{(i)}\log(p) + Y_2\log(p+0.4)+Y_3\log(0.4-2p).
+\end{align}
+$$
+
+This is what is implemented in R, to approximate the MLE of $p$. As for the maximization done in the first case, it is done via the function `optimize` here as well, since analytic maximization is tedious. The iteration is stopped when the difference between consecutive values of $p^{(i)}$ reaches some (low) tolerance level. The results are shown below. 
+
+```{r}
+p0 <- 0.1 # Initial value
+
+# E-step.
+E <- function(p0){
+    return((y1*p0)/(p0+0.2))
+}
+# M-step.
+M <- function(p0, expe){
+  l <- function(p){
+    return(expe*log(p)+y2*log(p+0.4)+y3*log(0.4-2*p))
+  }
+  m <- optimize(l, interval = c(0,0.2), maximum = T)
+  return(m$maximum)
+}
+
+# Fixed point iterations.
+EM <- function(p0, maxiter, tol){
+  errest <- 2*tol
+  i <- 0
+  ps <- c(p0)
+  while (errest > tol && i < maxiter){
+    expe <- E(p0)
+    p1 <- M(p0, expe)
+    ps <- c(ps, p1)
+    errest <- abs(p1-p0)
+    p0 <- p1
+    i <- i + 1
+  }
+  return(list(ps, p1, i))
+}
+
+maxiter <- 100
+tol <- 0.000000000000001
+results <- EM(p0, maxiter, tol)
+
+knitr::kable(data.frame("Value" = results[[1]]), row.names = 1:results[[3]], caption = "Values of p in each Iteration")
+```
+
+As we can see, the approximated value to the MLE of $p$ is `r results[[2]]`, and the objective function at this value is `r analytic.lik(results[[2]])`. Comparing with the first solution, as shown in the table below, we see that they are very similar. 
+
+```{r}
+df <- cbind("First Max." = c(ana$maximum, ana$objective), "EM" = c(results[[2]], analytic.lik(results[[2]])))
+rownames(df) <- c("MLE approx. of p", "Objective Value")
+knitr::kable(df, caption = "Comparison of Analytic Maximization and EM")
+```
+

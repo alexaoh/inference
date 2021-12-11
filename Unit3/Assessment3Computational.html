@@ -179,7 +179,7 @@ pre code {
 <h1 class="title toc-ignore">Computational Part of Assessment Exercises</h1>
 <h3 class="subtitle">Advanced Statistical Inference - Unit 3</h3>
 <h4 class="author">Alexander J Ohrt</h4>
-<h4 class="date">10 desember, 2021</h4>
+<h4 class="date">11 desember, 2021</h4>
 
 </div>
 
@@ -315,7 +315,7 @@ optimize(loglik, data = alpha_1, interval = c(0,10), maximum = T)</code></pre>
 </div>
 <div id="problem-4" class="section level2">
 <h2>Problem 4</h2>
-<p>Consider the 100 observations from a multinomial model with four cells governed by a parameter <span class="math inline">\(p \in (0,.2)\)</span></p>
+<p>Consider 80 observations from a multinomial model with three cells governed by a parameter <span class="math inline">\(p \in (0,.2)\)</span></p>
 <table>
 <thead>
 <tr class="header">
@@ -341,6 +341,220 @@ optimize(loglik, data = alpha_1, interval = c(0,10), maximum = T)</code></pre>
 </tbody>
 </table>
 <p>Use the EM algorithm to approximate the MLE of <span class="math inline">\(p\)</span>. Take <span class="math inline">\(p_0 = 0.1\)</span> as the initial value.</p>
+<p>First of all I will calculate the explicit log-likelihood function for this problem and maximize it. After this, we will see that the EM algorithm approximates the result.</p>
+<pre class="r"><code>y1 &lt;- 20
+y2 &lt;- 50
+y3 &lt;- 10</code></pre>
+<p>Since we know that this is a multinomial model, the joint density of the observations is</p>
+<p><span class="math display">\[
+f(\mathbf{y}|p) = \frac{n!}{y_1!y_2!y_3!} (p+0.2)^{y_1}(p+0.4)^{y_2}(0.4-2p)^{y_3}.
+\]</span></p>
+<p>Thus, the log-likelihood function is</p>
+<p><span class="math display">\[
+l(p|\mathbf{y}) = y_1\log(p+0.2) + y_2\log(p+0.4) + y_3\log(0.4-2p),
+\]</span></p>
+<p>when we ignore the values that do not depend on <span class="math inline">\(p\)</span>. This can be maximized analytically, which requires some tedious computation. Instead, it is maximized numerically, via the <code>optimize</code> function. The result is</p>
+<pre class="r"><code># Maximize the analytical function (numerically) to check results. 
+analytic.lik &lt;- function(p){
+  return(y1*log(p+0.2) + y2*log(p+0.4)+y3*log(0.4-2*p))
+}
+ana &lt;- optimize(analytic.lik, interval = c(0,0.2), maximum = T)
+ana$maximum</code></pre>
+<pre><code>## [1] 0.1347558</code></pre>
+<p>where the value of the objective function in the maximum is -73.5490431. As inspired by some <a href="https://www.math.kth.se/matstat/gru/Statistical%20inference/Lecture8.pdf">lecture notes</a> from KTH on the EM algorithm, let us imagine that we have four cells instead of three by splitting the first cell into two. Thus, we have the table</p>
+<table>
+<thead>
+<tr class="header">
+<th>Cell</th>
+<th>1.1</th>
+<th>1.2</th>
+<th>2</th>
+<th>3</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Probability</td>
+<td><span class="math inline">\(p\)</span></td>
+<td><span class="math inline">\(0.2\)</span></td>
+<td><span class="math inline">\(p + 0.4\)</span></td>
+<td><span class="math inline">\(0.4 - 2p\)</span></td>
+</tr>
+<tr class="even">
+<td>Frequencies</td>
+<td>?</td>
+<td>?</td>
+<td>50</td>
+<td>10</td>
+</tr>
+</tbody>
+</table>
+<p>where we no longer know the exact frequency in cell 1.1 and 1.2. We only know that <span class="math inline">\(y_{1.1} + y_{1.2} = y_1 = 20\)</span>. The joint density with this model in mind is</p>
+<p><span class="math display">\[
+f_2(\mathbf{y}|p) = \frac{n!}{y_{1.1}!y_{1.2}!y_2!y_3!} p^{y_{1.1}}0.2^{y_{1.2}}(p+0.4)^{y_2}(0.4-2p)^{y_3}, 
+\]</span></p>
+<p>which gives the log-likelihood function</p>
+<p><span class="math display">\[
+l_2(p|\mathbf{y}) = y_{1.1}\log(p) + y_2\log(p+0.4) + y_3\log(0.4-2p).
+\]</span></p>
+<p>This cannot be maximized, since <span class="math inline">\(y_{1.1}\)</span> is a latent variable. This is where the EM algorithm comes into play. Set the initial guess <span class="math inline">\(p^{(0)} = 0.1\)</span>. In the first <span class="math inline">\(\textit{expectation}\)</span>-step (E-step) we calculate</p>
+<p><span class="math display">\[
+Q(p|p^{(0)}) = \text{E}_{p^{(0)}}[l_2(p|\mathbf{Y})|Y_1, Y_2, Y_3], 
+\]</span></p>
+<p>i.e. the expectation of the log-likelihood function given the observed variables, with respect to the initial guess for the parameter <span class="math inline">\(p\)</span>. In the <span class="math inline">\(\textit{maximization}\)</span>-step (M-step) the guess for <span class="math inline">\(p\)</span> will be updated by maximizing the expectation found in the E-step. Going back to the E-step, the value is calculated by noting that <span class="math inline">\(Y_{1.1}|Y_1 \sim Bin(n = Y_1, p = \frac{p^{(0)}}{p^{(0)}+0.2})\)</span> for the first step. Thus, we get</p>
+<p><span class="math display">\[
+\begin{align}
+  Q(p|p^{(0)}) &amp;= \text{E}_{p^{(0)}}[l_2(p|\mathbf{Y})|Y_1, Y_2, Y_3] \\
+               &amp;= \text{E}_{p^{(0)}}[Y_{1.1}|Y_1]\log(p) + Y_2\log(p+0.4)+Y_3\log(0.4-2p) \\ 
+               &amp;= \frac{Y_1p^{(0)}}{p^{(0)} + 0.2}\log(p) + Y_2\log(p+0.4)+Y_3\log(0.4-2p) \\
+               &amp;= y_{1.1}^{(0)}\log(p) + Y_2\log(p+0.4)+Y_3\log(0.4-2p),
+\end{align}
+\]</span></p>
+<p>where we have defined <span class="math inline">\(y_{1.1}^{(0)} := \frac{Y_1p^{(0)}}{p^{(0)} + 0.2}\)</span>. As already noted, the expectation <span class="math inline">\(Q(p|p^{(0)})\)</span> is maximized with respect to <span class="math inline">\(p\)</span> in the M-step, in order to find the new guess for <span class="math inline">\(p\)</span>, <span class="math inline">\(p^{(1)}\)</span>. The final iteration takes the form</p>
+<p><span class="math display">\[
+\begin{align}
+y_{1.1}^{(i)} &amp;= \frac{Y_1p^{(i)}}{p^{(i)} + 0.2},\\
+p^{(i+1)} &amp;= \max_{p}Q(p|p^{(i)}) = \max_{p} y_{1.1}^{(i)}\log(p) + Y_2\log(p+0.4)+Y_3\log(0.4-2p).
+\end{align}
+\]</span></p>
+<p>This is what is implemented in R, to approximate the MLE of <span class="math inline">\(p\)</span>. As for the maximization done in the first case, it is done via the function <code>optimize</code> here as well, since analytic maximization is tedious. The iteration is stopped when the difference between consecutive values of <span class="math inline">\(p^{(i)}\)</span> reaches some (low) tolerance level. The results are shown below.</p>
+<pre class="r"><code>p0 &lt;- 0.1 # Initial value
+
+# E-step.
+E &lt;- function(p0){
+    return((y1*p0)/(p0+0.2))
+}
+# M-step.
+M &lt;- function(p0, expe){
+  l &lt;- function(p){
+    return(expe*log(p)+y2*log(p+0.4)+y3*log(0.4-2*p))
+  }
+  m &lt;- optimize(l, interval = c(0,0.2), maximum = T)
+  return(m$maximum)
+}
+
+# Fixed point iterations.
+EM &lt;- function(p0, maxiter, tol){
+  errest &lt;- 2*tol
+  i &lt;- 0
+  ps &lt;- c(p0)
+  while (errest &gt; tol &amp;&amp; i &lt; maxiter){
+    expe &lt;- E(p0)
+    p1 &lt;- M(p0, expe)
+    ps &lt;- c(ps, p1)
+    errest &lt;- abs(p1-p0)
+    p0 &lt;- p1
+    i &lt;- i + 1
+  }
+  return(list(ps, p1, i))
+}
+
+maxiter &lt;- 100
+tol &lt;- 0.000000000000001
+results &lt;- EM(p0, maxiter, tol)
+
+knitr::kable(data.frame(&quot;Value&quot; = results[[1]]), row.names = 1:results[[3]], caption = &quot;Values of p in each Iteration&quot;)</code></pre>
+<table>
+<caption>Values of p in each Iteration</caption>
+<thead>
+<tr class="header">
+<th align="left"></th>
+<th align="right">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">1</td>
+<td align="right">0.1000000</td>
+</tr>
+<tr class="even">
+<td align="left">2</td>
+<td align="right">0.1310531</td>
+</tr>
+<tr class="odd">
+<td align="left">3</td>
+<td align="right">0.1344163</td>
+</tr>
+<tr class="even">
+<td align="left">4</td>
+<td align="right">0.1347221</td>
+</tr>
+<tr class="odd">
+<td align="left">5</td>
+<td align="right">0.1347495</td>
+</tr>
+<tr class="even">
+<td align="left">6</td>
+<td align="right">0.1347519</td>
+</tr>
+<tr class="odd">
+<td align="left">7</td>
+<td align="right">0.1347521</td>
+</tr>
+<tr class="even">
+<td align="left">8</td>
+<td align="right">0.1347521</td>
+</tr>
+<tr class="odd">
+<td align="left">9</td>
+<td align="right">0.1347521</td>
+</tr>
+<tr class="even">
+<td align="left">10</td>
+<td align="right">0.1347521</td>
+</tr>
+<tr class="odd">
+<td align="left">11</td>
+<td align="right">0.1347521</td>
+</tr>
+<tr class="even">
+<td align="left">12</td>
+<td align="right">0.1347521</td>
+</tr>
+<tr class="odd">
+<td align="left">13</td>
+<td align="right">0.1347521</td>
+</tr>
+<tr class="even">
+<td align="left">14</td>
+<td align="right">0.1347521</td>
+</tr>
+<tr class="odd">
+<td align="left">15</td>
+<td align="right">0.1347521</td>
+</tr>
+<tr class="even">
+<td align="left">16</td>
+<td align="right">0.1347521</td>
+</tr>
+</tbody>
+</table>
+<p>As we can see, the approximated value to the MLE of <span class="math inline">\(p\)</span> is 0.1347521, and the objective function at this value is -73.549043. Comparing with the first solution, as shown in the table below, we see that they are very similar.</p>
+<pre class="r"><code>df &lt;- cbind(&quot;First Max.&quot; = c(ana$maximum, ana$objective), &quot;EM&quot; = c(results[[2]], analytic.lik(results[[2]])))
+rownames(df) &lt;- c(&quot;MLE approx. of p&quot;, &quot;Objective Value&quot;)
+knitr::kable(df, caption = &quot;Comparison of Analytic Maximization and EM&quot;)</code></pre>
+<table>
+<caption>Comparison of Analytic Maximization and EM</caption>
+<thead>
+<tr class="header">
+<th align="left"></th>
+<th align="right">First Max.</th>
+<th align="right">EM</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">MLE approx. of p</td>
+<td align="right">0.1347558</td>
+<td align="right">0.1347521</td>
+</tr>
+<tr class="even">
+<td align="left">Objective Value</td>
+<td align="right">-73.5490431</td>
+<td align="right">-73.5490430</td>
+</tr>
+</tbody>
+</table>
 </div>
 
 
