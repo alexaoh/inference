@@ -25,10 +25,55 @@ library(dplyr)
 
 ### 2.4
 
-Contour plot of the relative log-likelihood $\tilde{l}(\lambda, \theta)$.
+The profile log-likelihoods $l_p(\lambda)$ and $l_p(\theta)$ are plotted below. 
+
+```{r}
+d1 <- 17
+d2 <- 28
+d <- d1+d2
+Y1 <- 2768.9
+Y2 <- 1857.5
+```
+
+First, $l_p(\lambda)$ is plotted. 
+
+```{r}
+lambda <- seq(0, 1, length.out = 100)
+l.lambda <- function(lambda){
+  d1*log(lambda)-lambda*Y1
+}
+plot(lambda, l.lambda(lambda), ty = "l", main = "Profile log-likelihood for lambda")
+```
+
+Next, $l_p(\theta)$ is plotted. 
+
+```{r}
+theta <- seq(0, 1, length.out = 100)
+l.theta <- function(theta){
+  -d*log(theta*Y2 + Y1) + d2*log(theta) - (d*Y2)/(theta*Y2+Y1)*theta
+}
+plot(theta, l.theta(theta), ty = "l", main = "Profile log-likelihood for theta", col = "red", lty = 1)
+lines(lambda, l.lambda(lambda), col = "blue", lty = 2)
+legend("bottomright", legend = c("theta", "lambda"), col = c("red", "blue"), lty = 1:2)
+# Does not make sense adding them to same plot I think!
+```
+
+A contour plot of the relative log-likelihood $\tilde{l}(\lambda, \theta)$ is made below. 
 
 ```{r}
 # Using the contour function. 
+loglik.prob2 <- function(lambda, theta){
+  d*log(lambda)+d2*log(theta)-lambda*Y1-theta%*%lambda*Y2 
+}
+lambda.hat <- d1/Y1
+theta.hat <- d2/d1*Y1/Y2
+
+relative.like <- function(lambda, theta){
+  loglik.prob2(lambda, theta)/loglik.prob2(lambda.hat, theta.hat)
+}
+grid <- expand.grid(lambda, theta)
+contour(x = lambda, y = theta, z = matrix(relative.like(lambda, theta), nrow = 100))
+# How can I make the grid such that z is a proper matrix!?
 ```
 
 
