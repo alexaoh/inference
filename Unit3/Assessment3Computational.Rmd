@@ -16,6 +16,7 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
+rm(list = ls())
 knitr::opts_chunk$set(echo = TRUE, warning = F)
 setwd("/home/ajo/gitRepos/inference/Unit2")
 library(dplyr)
@@ -33,64 +34,67 @@ d2 <- 28
 d <- d1+d2
 Y1 <- 2768.9
 Y2 <- 1857.5
+n <- 1000
 ```
 
 First, $l_p(\lambda)$ is plotted. 
 
 ```{r}
-lambda <- seq(0, 1, length.out = 100)
+lambda <- seq(0,30, length.out = n)
 l.lambda <- function(lambda){
   d1*log(lambda)-lambda*Y1
 }
-plot(lambda, l.lambda(lambda), ty = "l", main = "Profile log-likelihood for lambda")
+plot(lambda, l.lambda(lambda), ty = "l", main = "Profile log-likelihood for lambda", col = "red")
 ```
 
 Next, $l_p(\theta)$ is plotted. 
 
 ```{r}
-theta <- seq(0, 1, length.out = 100)
+theta <- seq(0, 30, length.out = n)
 l.theta <- function(theta){
   -d*log(theta*Y2 + Y1) + d2*log(theta) - (d*Y2)/(theta*Y2+Y1)*theta
 }
 plot(theta, l.theta(theta), ty = "l", main = "Profile log-likelihood for theta", col = "red", lty = 1)
-lines(lambda, l.lambda(lambda), col = "blue", lty = 2)
-legend("bottomright", legend = c("theta", "lambda"), col = c("red", "blue"), lty = 1:2)
-# Does not make sense adding them to same plot I think!
 ```
 
 A contour plot of the relative log-likelihood $\tilde{l}(\lambda, \theta)$ is made below. 
 
 ```{r}
-# Using the contour function. 
 loglik.prob2 <- function(lambda, theta){
-  d*log(lambda)+d2*log(theta)-lambda*Y1-theta%*%lambda*Y2 
+  d*log(lambda)+d2*log(theta)-lambda*Y1-theta%o%lambda*Y2 
 }
-lambda.hat <- d1/Y1
-theta.hat <- d2/d1*Y1/Y2
+lambda.hat <- rep(d1/Y1, length.out = n)
+theta.hat <- rep(d2/d1*Y1/Y2, length.out = n)
 
 relative.like <- function(lambda, theta){
   loglik.prob2(lambda, theta)/loglik.prob2(lambda.hat, theta.hat)
 }
-grid <- expand.grid(lambda, theta)
-contour(x = lambda, y = theta, z = matrix(relative.like(lambda, theta), nrow = 100))
-# How can I make the grid such that z is a proper matrix!?
+
+contour(x = lambda, y = theta, z = relative.like(lambda, theta), main = "Relative log-likelihood")
+lines(x = lambda, y = theta.hat, col = "red", lty = 3)
+lines(x = lambda.hat, y = theta, col = "blue", lty = 2)
+# legend("bottomleft", legend = c("(lambda, hat{theta}(lambda))", "(hat{lambda}(theta), theta)"), 
+#        col = c("red", "blue"), lty = 3:2)
 ```
 
+The red dotted line represents $(\lambda, \hat{\theta}(\lambda))$ and the blue dotted line represents $(\hat{\lambda}(\theta), \theta)$.
 
 ## Problem 3
 
 ### 3.4
 
-The Newton-Raphson algorithm is implemented using the expressions obtained analytically. The function is given in the cell below. 
+The Newton-Raphson algorithm is implemented using the expressions obtained analytically.  
 
 ```{r}
 newton.raphson <- function(sample, it0, eps, maxiter){
   n <- length(sample)
   d1 <- function(iterate){
+    # First derivative of log-likelihood.
     return(n/iterate + sum(log(sample)*(1-sample^iterate)))
   }
   
   d2 <- function(iterate){
+    # Second derivative of log-likelihood.
     return(-n/iterate^2 - sum(sample^iterate*(log(sample))^2))
   }
   
@@ -111,39 +115,43 @@ newton.raphson <- function(sample, it0, eps, maxiter){
 
 Generate samples of size n = 5 from a Weibull distribution with parameters $\alpha = 1$, $\alpha = 2$ and $\alpha = 5$ respectively. Apply the preceding algorithm to obtain a numerical approximation to the value  of $\alpha$ in each case. Comment on the difference between the results of each case.
 
+The numerical approximation in each of the cases is given in the table below. 
+
 ```{r}
 set.seed(1)
 n <- 5
 alpha_1 <- rweibull(n = n, scale = 1, shape = 1)
 alpha_2 <- rweibull(n = n, scale = 1, shape = 2)
 alpha_5 <- rweibull(n = n, scale = 1, shape = 5)
-```
-
-The numerical approximation in each of the cases is given below. First, the numerical approximation to $\alpha = 1$ when generating $n = 5$ samples is
-
-```{r}
 eps <- 0.0000000000001
 par <- 0.5
-newton.raphson(alpha_1, par, eps, 100)
-```
-
-Next, the numerical approximation to $\alpha = 2$ when generating $n = 5$ samples is
-
-```{r}
-newton.raphson(alpha_2, par, eps, 100)
-```
-
-Finally, the numerical approximation to $\alpha = 5$ when generating $n = 5$ samples is
-
-```{r}
-newton.raphson(alpha_5, par, eps, 100)
+s.1 <- newton.raphson(alpha_1, par, eps, 100)
+s.2 <- newton.raphson(alpha_2, par, eps, 100)
+s.5 <- newton.raphson(alpha_5, par, eps, 100)
+results <- rbind(s.1, s.2, s.5)
+rownames(results) <- c("alpha = 1", "alpha = 2", "alpha = 5") 
+knitr::kable(results, caption = "Approx. With Newton-Raphson")
 ```
 
 It is apparent that none of the results are very similar to the true values of $\alpha$. This is largely because we only have $n = 5$ samples in each case. If the sample size is increased, the fixed points come much closer to the true values. 
 
-OTHER COMMENTS?!
+An example of the results after an increased sample size ($n=10000$) can be seen below. 
 
-For completeness we check the results using the `optim` function. The first results is 
+```{r}
+set.seed(1)
+n <- 10000
+alpha_1.1 <- rweibull(n = n, scale = 1, shape = 1)
+alpha_2.1 <- rweibull(n = n, scale = 1, shape = 2)
+alpha_5.1 <- rweibull(n = n, scale = 1, shape = 5)
+s.bigger.1 <- newton.raphson(alpha_1.1, par, eps, 100)
+s.bigger.2 <- newton.raphson(alpha_2.1, par, eps, 100)
+s.bigger.5 <- newton.raphson(alpha_5.1, par, eps, 100)
+results <- rbind(s.bigger.1, s.bigger.2, s.bigger.5)
+rownames(results) <- c("alpha = 1", "alpha = 2", "alpha = 5") 
+knitr::kable(results, caption = "Approx. After Increasing Sample Size")
+```
+
+For completeness we check the results, when generating samples of size $n=5$, using the `optim` function. The results are 
 
 ```{r}
 loglik <- function(alpha, data){
@@ -156,46 +164,23 @@ gr <- function(alpha, data){
   return(n/alpha + sum(log(data)*(1-data^alpha)))
 }
 
-# optim(par = 0.5, fn = loglik, data = alpha_1, 
-#       hessian = T, method = "L-BFGS-B", lower = eps, 
-#       upper = 1-eps, control = list(fnscale = -1))
-
 res1 <- optim(par = par, fn = loglik, data = alpha_1, 
       hessian = T, control = list(fnscale = -1))
-(cbind("Fixed Point" = res1$par, "Iterations" = res1$counts[[1]], "Hessian" = res1$hessian[[1]], "Convergence" = res1$convergence))
 
-res1 <- optim(par = par, fn = loglik, gr = gr, data = alpha_1, hessian = T, control = list(fnscale = -1))
-(cbind("Fixed Point" = res1$par, "Iterations" = res1$counts[[1]], "Hessian" = res1$hessian[[1]], "Convergence" = res1$convergence))
-
-# The below gives the same result. 
-optimize(loglik, data = alpha_1, interval = c(0,10), maximum = T)
-```
-
-The second result is 
-
-```{r}
 res2 <- optim(par = par, fn = loglik, data = alpha_2, 
       hessian = T, control = list(fnscale = -1))
-(cbind("Fixed Point" = res2$par, "Iterations" = res2$counts[[1]], "Hessian" = res2$hessian[[1]], "Convergence" = res2$convergence))
 
-res2 <- optim(par = par, fn = loglik, gr = gr, data = alpha_2, 
-      hessian = T, control = list(fnscale = -1))
-(cbind("Fixed Point" = res2$par, "Iterations" = res2$counts[[1]], "Hessian" = res2$hessian[[1]], "Convergence" = res2$convergence))
-```
-
-The third result is 
-
-```{r}
 res3 <- optim(par = par, fn = loglik, data = alpha_5, 
       hessian = T, control = list(fnscale = -1))
-(cbind("Fixed Point" = res3$par, "Iterations" = res3$counts[[1]], "Hessian" = res3$hessian[[1]], "Convergence" = res3$convergence))
-
-res3 <- optim(par = par, fn = loglik, gr = gr, data = alpha_5, 
-      hessian = T, control = list(fnscale = -1))
-(cbind("Fixed Point" = res3$par, "Iterations" = res3$counts[[1]], "Hessian" = res3$hessian[[1]], "Convergence" = res3$convergence))
+results <- rbind(c(res1$par, res1$convergence, res1$hessian), 
+                 c(res2$par, res2$convergence, res2$hessian),
+                 c(res3$par, res3$convergence, res3$hessian))
+rownames(results) <- c("alpha = 1", "alpha = 2", "alpha = 5") 
+colnames(results) <- c("Fixed Point", "Convergence", "Hessian")
+knitr::kable(results, caption = "Approx. With Optim.")
 ```
 
-As is apparent, the `optim` function (using the Nelder-Mead method for maximization) gives a very similar results to our implementation. 
+As is apparent, the `optim` function (using the Nelder-Mead method for maximization) gives very similar results to our implementation. 
 
 ## Problem 4
 
