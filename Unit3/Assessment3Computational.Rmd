@@ -52,7 +52,7 @@ Next, $l_p(\theta)$ is plotted.
 ```{r}
 theta <- seq(0, 30, length.out = n)
 l.theta <- function(theta){
-  -d*log(theta*Y2 + Y1) + d2*log(theta) - (d*Y2)/(theta*Y2+Y1)*theta
+  -d*log(theta*Y2 + Y1) + d2*log(theta) - d
 }
 plot(theta, l.theta(theta), ty = "l", main = "Profile log-likelihood for theta", col = "red", lty = 1)
 ```
@@ -213,7 +213,7 @@ $$
 l(p|\mathbf{y}) = y_1\log(p+0.2) + y_2\log(p+0.4) + y_3\log(0.4-2p),
 $$
 
-when we ignore the values that do not depend on $p$. This can be maximized analytically, which requires some tedious computation. Instead, it is maximized numerically, via the `optimize` function. The result is 
+when we ignore the factors that do not depend on $p$. This can be maximized analytically, which requires some tedious computation. Instead, it is maximized numerically, via the `optimize` function. The result is 
 
 ```{r}
 # Maximize the analytical function (numerically) to check results. 
