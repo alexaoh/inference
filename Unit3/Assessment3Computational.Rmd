@@ -52,7 +52,7 @@ Next, $l_p(\theta)$ is plotted.
 ```{r}
 theta <- seq(0, 30, length.out = n)
 l.theta <- function(theta){
-  -d*log(theta*Y2 + Y1) + d2*log(theta) - d
+  -d*log(theta*Y2 + Y1) + d2*log(theta)
 }
 plot(theta, l.theta(theta), ty = "l", main = "Profile log-likelihood for theta", col = "red", lty = 1)
 ```
@@ -73,8 +73,6 @@ relative.like <- function(lambda, theta){
 contour(x = lambda, y = theta, z = relative.like(lambda, theta), main = "Relative log-likelihood")
 lines(x = lambda, y = theta.hat, col = "red", lty = 3)
 lines(x = lambda.hat, y = theta, col = "blue", lty = 2)
-# legend("bottomleft", legend = c("(lambda, hat{theta}(lambda))", "(hat{lambda}(theta), theta)"), 
-#        col = c("red", "blue"), lty = 3:2)
 ```
 
 The red dotted line represents $(\lambda, \hat{\theta}(\lambda))$ and the blue dotted line represents $(\hat{\lambda}(\theta), \theta)$.
